@@ -1,4 +1,4 @@
-import mat73, json, scipy.io, os, arff
+import mat73, json, scipy.io, os
 import os.path as osp
 import pandas as pd
 import numpy as np
@@ -20,9 +20,21 @@ def load_odds(fpath):
     except NotImplementedError:
         mat = mat73.loadmat(fpath)
     except:
-        dataset = arff.load(open(fpath, 'rb'))
-        for data in dataset:
-            print(data)
+        with open(fpath, 'r') as fp:
+            lines = fp.readlines()
+        lines = [line.strip() for line in lines]
+        data = False
+        categorical = []
+        for line in lines:
+            if not data:
+                if "@attribute" in line:
+                    attri = line.split()
+                    name =
+                    potential_ = attri[attri.index("@attribute") + 2]
+                elif "@data" in line:
+                    data = True
+            else:
+                newContent.append(line)
 
     X = mat['X']
     Y = mat['y']
