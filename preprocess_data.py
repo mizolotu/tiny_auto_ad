@@ -25,16 +25,39 @@ def load_odds(fpath):
         lines = [line.strip() for line in lines]
         data = False
         categorical = []
+        label_key = 'class'
+        mat = {'X': [], 'y': []}
         for line in lines:
             if not data:
                 if "@attribute" in line:
                     attri = line.split()
-                    name =
-                    potential_ = attri[attri.index("@attribute") + 2]
+                    attr_name = attri[attri.index("@attribute") + 1]
+                    value_set = ''.join(attri[attri.index("@attribute") + 2:])
+                    if value_set.startswith('{') and value_set.endswith('}'):
+                        value_set = sorted(value_set.split('{')[1].split('}')[0].split(','))
+                        if attr_name == label_key:
+                            assert len(value_set) == 2
+                            label_position = len(categorical)
+                        categorical.append(value_set)
+                    else:
+                        categorical.append(None)
                 elif "@data" in line:
                     data = True
             else:
-                newContent.append(line)
+                x = []
+                for i, (item, c) in enumerate(zip(line.split(','), categorical)):
+                    if i == label_position:
+                        y = c.index(item)
+                    elif c is not None:
+                        x_ = np.zeros(len(c))
+                        x_[c.index(item)] = 1
+                        x.append(x_)
+                    else:
+                        x.append(float(item))
+                mat['X'].append(np.hstack(x))
+                mat['y'].append(y)
+        mat['X'] = np.vstack(mat['X'])
+        mat['y'] = np.hstack(mat['y']).reshape(-1, 1)
 
     X = mat['X']
     Y = mat['y']
@@ -47,15 +70,12 @@ if __name__ == '__main__':
     data_dir = 'data'
     dataset_files = os.listdir(data_dir)
 
-    with open('data/metainfo.json', 'r') as fp:
+    with open(f'{data_dir}/metainfo.json', 'r') as fp:
         metainfo = json.load(fp)
 
     for dataset in metainfo:
-        print(dataset)
         fpath = osp.join(data_dir, dataset['file'])
-        print(fpath)
-        loader = locals()[f"load_{dataset['benchmark']}"]
-        print(loader)
+        loader = globals()[f"load_{dataset['benchmark']}"]
         X, Y = loader(fpath)
         print(fpath, X.shape, Y.shape)
 
