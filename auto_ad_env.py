@@ -1,6 +1,5 @@
 import numpy as np
-import gym, os, json
-import os.path as osp
+import gym
 
 from gym import spaces
 from sklearn.metrics import auc
@@ -9,8 +8,7 @@ class AutoAdEnv(gym.Env):
 
     metadata = {'render.modes': ['human']}
 
-    def __init__(self, datasets, n_steps, n_features,
-                 n_samples=1000, n_clusters_max=8, a_max=7, n_unif=20, n_em_points=20, n_mv_points=20):
+    def __init__(self, datasets, n_steps, n_features, n_samples=5000, n_clusters_max=8, a_max=9, n_unif=20, n_em_points=20, n_mv_points=20):
         super(AutoAdEnv, self).__init__()
 
         self.algorithms = [

@@ -29,7 +29,7 @@ def make_env(env_class: Callable, seed: int, rank: int, *args) -> Callable:
 if __name__ == '__main__':
 
     parser = arp.ArgumentParser(description='Train agent.')
-    parser.add_argument('-i', '--iterations', help='Number of training iterations', type=int, default=1000)
+    parser.add_argument('-i', '--iterations', help='Number of training iterations', type=int, default=100)
     parser.add_argument('-e', '--environments', help='Number of training environments', type=int, default=4)
     args = parser.parse_args()
 
@@ -65,7 +65,7 @@ if __name__ == '__main__':
     train_env = SubprocVecEnv([make_env(env_class, SEED, i, tr_datasets, n_steps, n_features) for i in range(n_envs)])
     eval_env = SubprocVecEnv([make_env(env_class, SEED, n_envs, val_datasets, n_steps, n_features)])
 
-    model = PPO("MlpPolicy", env=train_env, n_steps=n_steps, batch_size=n_steps, verbose=1)
+    model = PPO("MlpPolicy", env=train_env, n_steps=n_steps, batch_size=n_steps, ent_coef=0.01, verbose=1)
     checkpoint_callback = CheckpointCallback(save_freq=eval_freq * n_steps, save_path='./logs/', name_prefix='rl_model')
     model.learn(
         total_timesteps=n_steps * n_envs * n_iterations,
