@@ -29,7 +29,8 @@ def make_env(env_class: Callable, seed: int, rank: int, *args) -> Callable:
 if __name__ == '__main__':
 
     parser = arp.ArgumentParser(description='Train agent.')
-    parser.add_argument('-e', '--episodes', help='Number of training time steps', type=int, default=1000)
+    parser.add_argument('-i', '--iterations', help='Number of training iterations', type=int, default=1000)
+    parser.add_argument('-e', '--environments', help='Number of training environments', type=int, default=4)
     args = parser.parse_args()
 
     target_dataset = load_dataset(TE_DATA_DIR, series_len=32, labels={0: ['normal', 'on_off'], 1: ['stick', 'tape', 'shake']})
@@ -56,9 +57,9 @@ if __name__ == '__main__':
     val_datasets = [datasets_selected[i] for i in val] if len(val) > 0 else datasets_selected
 
     env_class = AutoAdEnv
-    n_envs = 4
+    n_envs = args.environments
     n_steps = 100
-    n_episodes = args.episodes
+    n_iterations = args.iterations
     eval_freq = 10
 
     train_env = SubprocVecEnv([make_env(env_class, SEED, i, tr_datasets, n_steps, n_features) for i in range(n_envs)])
@@ -67,7 +68,7 @@ if __name__ == '__main__':
     model = PPO("MlpPolicy", env=train_env, n_steps=n_steps, batch_size=n_steps, verbose=1)
     checkpoint_callback = CheckpointCallback(save_freq=eval_freq * n_steps, save_path='./logs/', name_prefix='rl_model')
     model.learn(
-        total_timesteps=n_steps * n_envs * n_episodes,
+        total_timesteps=n_steps * n_envs * n_iterations,
         eval_env=eval_env,
         eval_freq=eval_freq * n_steps,
         callback=checkpoint_callback,
@@ -84,7 +85,7 @@ if __name__ == '__main__':
         rewards.extend(reward)
     print(f'Mean reward: {np.mean(rewards)}, max reward: {np.max(rewards)}')
 
-    PPO.load(f'logs/rl_model_{total_steps * n_envs * n_steps}_steps.zip', env=te_env)
+    PPO.load(f'logs/rl_model_{n_iterations * n_envs * n_steps}_steps.zip', env=te_env)
 
     print('Learned policy:')
     obs = te_env.reset()
