@@ -1,8 +1,8 @@
 import json, gym
 import sys
-
 import numpy as np
 import os.path as osp
+import argparse as arp
 
 from stable_baselines3.common.vec_env import SubprocVecEnv
 from stable_baselines3.common.utils import set_random_seed
@@ -27,6 +27,10 @@ def make_env(env_class: Callable, seed: int, rank: int, *args) -> Callable:
     return _init
 
 if __name__ == '__main__':
+
+    parser = arp.ArgumentParser(description='Train agent.')
+    parser.add_argument('-e', '--episodes', help='Number of training time steps', type=int, default=1000)
+    args = parser.parse_args()
 
     target_dataset = load_dataset(TE_DATA_DIR, series_len=32, labels={0: ['normal', 'on_off'], 1: ['stick', 'tape', 'shake']})
     n_features = target_dataset['X'].shape[1]
@@ -54,8 +58,7 @@ if __name__ == '__main__':
     env_class = AutoAdEnv
     n_envs = 4
     n_steps = 100
-    n_features = 12
-    total_steps = 100
+    n_episodes = args.episodes
     eval_freq = 10
 
     train_env = SubprocVecEnv([make_env(env_class, SEED, i, tr_datasets, n_steps, n_features) for i in range(n_envs)])
@@ -64,7 +67,7 @@ if __name__ == '__main__':
     model = PPO("MlpPolicy", env=train_env, n_steps=n_steps, batch_size=n_steps, verbose=1)
     checkpoint_callback = CheckpointCallback(save_freq=eval_freq * n_steps, save_path='./logs/', name_prefix='rl_model')
     model.learn(
-        total_timesteps=n_steps*n_envs * total_steps,
+        total_timesteps=n_steps * n_envs * n_episodes,
         eval_env=eval_env,
         eval_freq=eval_freq * n_steps,
         callback=checkpoint_callback,
