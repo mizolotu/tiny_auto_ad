@@ -65,6 +65,54 @@ def load_odds(fpath):
         Y = Y.reshape(-1, 1)
     return X, Y
 
+def simple_features(X):
+    assert len(X.shape) == 3
+    m = X.shape[2]
+    I = np.ones((m, m))
+    I[np.triu_indices(m)] = 0
+    E = np.vstack([
+        np.hstack([
+            np.min(x, 0),
+            np.max(x, 0),
+            np.mean(x, 0),
+            np.std(x, 0),
+        ]) for x in X
+    ])
+    return E
+
+def load_dataset(data_dir, series_len, labels, feature_extractor='simple_features'):
+    sample_subdirs = [subdir for subdir in os.listdir(data_dir) if osp.isdir(osp.join(data_dir, subdir))]
+    X, Y = [], []
+    for label_key in labels:
+        for label_val in labels[label_key]:
+            if label_val in sample_subdirs:
+                sample_files = os.listdir(osp.join(data_dir, label_val))
+                for sf in sample_files:
+                    fpath = osp.join(osp.join(data_dir, label_val), sf)
+                    if osp.isfile(fpath) and fpath.endswith('.csv'):
+                        x = pd.read_csv(fpath, header=None).values
+                        n = x.shape[0]
+                        y = np.ones((n, 1)) * label_key
+                        n_series = n // series_len
+                        for j in range(n_series):
+                            j = np.random.randint(0, n - series_len)
+                            s_x = x[j: j + series_len, :]
+                            s_y = y[j + series_len, 0]
+                            X.append(s_x)
+                            Y.append(s_y)
+    X = np.array(X)
+    Y = np.vstack(Y)
+
+    idx = np.arange(X.shape[0])
+    np.random.shuffle(idx)
+    X = X[idx, :]
+    Y = Y[idx, :]
+
+    extract_features = globals()[feature_extractor]
+    X = extract_features(X)
+
+    return {'X': X, 'Y': Y}
+
 if __name__ == '__main__':
 
     data_dir = 'data'

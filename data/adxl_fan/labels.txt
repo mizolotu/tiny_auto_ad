@@ -1,0 +1,1 @@
+normal,shake,tape,stick

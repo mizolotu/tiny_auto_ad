@@ -364,7 +364,6 @@ class EvalCallback(EventCallback):
         :param globals_:
         """
         info = locals_["info"]
-
         if locals_["done"]:
             maybe_is_success = info.get("is_success")
             if maybe_is_success is not None:

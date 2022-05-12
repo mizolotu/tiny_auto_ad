@@ -385,6 +385,7 @@ class BaseAlgorithm(ABC):
             callback = ConvertCallback(callback)
 
         # Create eval callback in charge of the evaluation
+
         if eval_env is not None:
             eval_callback = EvalCallback(
                 eval_env,
