@@ -8,7 +8,7 @@ class AutoAdEnv(gym.Env):
 
     metadata = {'render.modes': ['human']}
 
-    def __init__(self, datasets, n_steps, n_features, n_samples=5000, n_clusters_max=8, a_max=9, n_unif=20, n_em_points=20, n_mv_points=20):
+    def __init__(self, datasets, n_steps, n_features, n_samples=5000, n_clusters_max=8, a_max=9, n_unif=25, n_em_points=25, n_mv_points=25):
         super(AutoAdEnv, self).__init__()
 
         self.algorithms = [
@@ -35,8 +35,6 @@ class AutoAdEnv(gym.Env):
         self.action_space = spaces.Box(shape=(act_dim,), low=-1, high=1)
 
     def step(self, action):
-
-        #print(f'Step {self.step_idx + 1}')
 
         alg_idx = int(np.round((action[0] + 1) / 2 * (self.n_algorithms - 1)))
         alg = self.algorithms[alg_idx]
