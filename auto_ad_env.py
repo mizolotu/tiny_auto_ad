@@ -13,7 +13,8 @@ class AutoAdEnv(gym.Env):
 
         self.algorithms = [
             '_scalable_kmeans',
-            '_clustream_kmeans'
+            '_clustream_kmeans',
+            '_weighted_ap'
         ]
 
         self.datasets = datasets
@@ -41,6 +42,8 @@ class AutoAdEnv(gym.Env):
 
         k = int(np.round((action[1] + 1) / 2 * (self.n_clusters[1] - self.n_clusters[0]))) + self.n_clusters[0]
         a = (action[2] + 1) / 2 * (self.std_multiplier[1] - self.std_multiplier[0]) + self.std_multiplier[0]
+
+        print(alg, k, a)
 
         data = self._sample_data()
 
@@ -331,6 +334,133 @@ class AutoAdEnv(gym.Env):
         C = np.array(centroids)
 
         return  xmin, xmax, C, W
+
+    def _weighted_affinity_propagation(self, data, n_clusters, n_micro_clusters=16, micro_cluster_radius_alpha=3, n_iters=100):
+
+        xmin = np.inf * np.ones(self.n_features)
+        xmax = -np.inf * np.ones(self.n_features)
+        C, R = [], []
+
+        # the main clustering loop
+
+        ntr = data[1].shape[0]
+        for xi in range(ntr):
+
+            # take a sample
+
+            x = data[0][xi, :].copy()
+
+            # update min and max values
+
+            xmin = np.min(np.vstack([xmin, x]), 0)
+            xmax = np.max(np.vstack([xmax, x]), 0)
+
+            # create initial micro-clsuter
+
+            if len(C) < 2:
+                C.append([1, x, x ** 2])
+                R.append(0)
+
+            # add sample to the existing framework
+
+            else:
+
+                # update the minimal distance between micro-clusters
+
+                D = np.zeros((len(C), len(C)))
+                for i in range(len(C)):
+                    for j in range(len(C)):
+                        if i < j:
+                            D[i, j] = np.sqrt(np.sum(((C[i][1] / C[i][0] - xmin) / (xmax - xmin + 1e-10) - (C[j][1] / C[j][0] - xmin) / (xmax - xmin + 1e-10)) ** 2))
+                        else:
+                            D[i, j] = np.inf
+                cl_dist_min = np.min(D)
+                i_dmin, j_dmin = np.where(D == cl_dist_min)
+                i_dmin = i_dmin[0]
+                j_dmin = j_dmin[0]
+
+                # update micro-cluster radiuses
+
+                for i in range(len(C)):
+                    if C[i][0] < 2:
+                        R[i] = cl_dist_min
+                    else:
+                        ls_ = (C[i][1] - C[i][0] * xmin) / (xmax - xmin + 1e-10)
+                        ss_ = (C[i][2] - 2 * C[i][1] * xmin + C[i][0] * xmin ** 2) / ((xmax - xmin) ** 2 + 1e-10)
+                        R[i] = micro_cluster_radius_alpha * np.mean(np.sqrt(np.clip(ss_ / C[i][0] - (ls_ / C[i][0]) ** 2, 0, np.inf)))
+                        if R[i] == 0:
+                            R[i] = cl_dist_min
+
+                # calculate distances from the sample to the micro-clusters
+
+                D = np.zeros(len(C))
+                for i in range(len(C)):
+                    D[i] = np.sqrt(np.sum(((x - xmin) / (xmax - xmin + 1e-10) - (C[i][1] / C[i][0] - xmin) / (xmax - xmin + 1e-10)) ** 2))
+                k = np.argmin(D)
+
+                if D[k] <= R[k]:
+
+                    # add sample to the existing micro-cluster
+
+                    C[k][0] += 1
+                    C[k][1] += x
+                    C[k][2] += x ** 2
+
+                else:
+
+                    # merge the closest clusters
+
+                    if len(C) == n_micro_clusters:
+                        C[i_dmin][0] += C[j_dmin][0]
+                        C[i_dmin][1] += C[j_dmin][1]
+                        C[i_dmin][2] += C[j_dmin][2]
+                        C[j_dmin][0] = 1
+                        C[j_dmin][1] = x
+                        C[j_dmin][2] = x ** 2
+                        # print(f'Micro-clusters {i_dmin} and {j_dmin} have been merged')
+
+                    # create a new cluster
+
+                    else:
+                        C.append([1, x, x ** 2])
+                        R.append(0)
+
+        W = np.hstack([c[0] for c in C])
+        C = np.vstack([c[1] / c[0] for c in C])
+
+        # weighted k-means clustering
+
+        count = np.hstack([c[0] for c in C])
+        centroids = C[np.random.choice(range(C.shape[0]), n_clusters, replace=False), :]
+
+        for i in range(n_iters):
+
+            D = np.zeros((C.shape[0], centroids.shape[0]))
+            for j in range(C.shape[0]):
+                for k in range(centroids.shape[0]):
+                    D[j, k] = np.sum(((C[j, :] - xmin) / (xmax - xmin + 1e-10) - (centroids[k, :] - xmin) / (xmax - xmin + 1e-10)) ** 2)
+            cl_labels = np.argmin(D, axis=1)
+
+            centroids_new = []
+            W_new = []
+
+            for j in range(n_clusters):
+                idx = np.where(cl_labels == j)[0]
+                if len(idx) > 0:
+                    centroids_new.append(np.sum(count[idx, None] * C[idx, :], axis=0) / (np.sum(count[idx] + 1e-10)))
+                    W_new.append(np.sum(count[idx]))
+                else:
+                    pass
+
+            if np.array_equal(centroids, centroids_new):
+                break
+
+            centroids = np.vstack(centroids_new)
+            W = np.hstack(W_new)
+
+        C = np.array(centroids)
+
+        return xmin, xmax, C, W
 
     def _calculate_radiuses(self, data, xmin, xmax, centroids, alpha):
 

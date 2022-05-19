@@ -24,28 +24,14 @@ if __name__ == '__main__':
 
     te_env = SubprocVecEnv([make_env(env_class, SEED, 0, [target_dataset], n_steps, n_features)])
 
-    print('Random policy:')
-
     obs = te_env.reset()
     rewards = []
     for i in range(n_steps):
+        #action = [[0, 0, 0]]
         action = [te_env.action_space.sample()]
+        action[0][0] = 1
         obs, reward, dones, info = te_env.step(action)
+        print(reward)
         rewards.extend(reward)
     print(f'Mean reward: {np.mean(rewards)}, max reward: {np.max(rewards)}')
     pp.plot(np.array(rewards), label='Random policy')
-
-    model = PPO.load(f'logs/rl_model_{model_idx}_steps.zip', env=te_env)
-
-    print('Learned policy:')
-
-    obs = te_env.reset()
-    rewards = []
-    for i in range(n_steps):
-        action, _states = model.predict(obs, deterministic=True)
-        obs, reward, dones, info = te_env.step(action)
-        rewards.extend(reward)
-    print(f'Mean reward: {np.mean(rewards)}, max reward: {np.max(rewards)}')
-    pp.plot(np.array(rewards), label='Learned policy')
-
-    pp.savefig('random_vs_learned.png')
