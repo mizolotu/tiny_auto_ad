@@ -113,6 +113,34 @@ def load_dataset(data_dir, series_len, labels, feature_extractor='simple_feature
 
     return {'X': X, 'Y': Y}
 
+def split_data(dataset, inf_split=0.3, val_split=0.3):
+
+    n_features = np.prod(dataset['X'].shape[1:])
+
+    idx0 = np.where(dataset['Y'] == 0)[0]
+    np.random.shuffle(idx0)
+
+    split = {}
+    split['inf'], train_val = np.split(idx0, [int(inf_split * len(idx0))])
+    split['val'], split['tr'] = np.split(train_val, [int(val_split * len(train_val))])
+
+    idx1 = np.where(dataset['Y'] == 1)[0]
+    idx1 = np.random.choice(idx1, len(split['inf']), replace=True)
+    split['inf'] = np.append(split['inf'], idx1)
+
+    idx = np.arange(dataset['X'].shape[1])
+    np.random.shuffle(idx)
+    idx = idx[:n_features]
+
+    X = dataset['X'][:, idx]
+    Y = dataset['Y'].squeeze()
+    data = {}
+
+    for key in split.keys():
+        data[key] = [X[split[key], :], Y[split[key]]]
+
+    return  data
+
 if __name__ == '__main__':
 
     data_dir = 'data'

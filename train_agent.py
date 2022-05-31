@@ -12,11 +12,7 @@ from typing import Callable
 from preprocess_data import load_skab, load_odds, load_dataset
 from stable_baselines3.common.callbacks import CheckpointCallback
 
-TR_DATA_DIR = 'data/benchmarks'
-TE_DATA_DIR = 'data/adxl_fan'
-VAL_SPLIT = 0.3
-SEED = 0
-
+from config import *
 
 def make_env(env_class: Callable, seed: int, rank: int, *args) -> Callable:
     def _init() -> gym.Env:
