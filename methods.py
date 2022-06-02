@@ -105,7 +105,7 @@ class ScalableKmeans:
             self.centroids = np.array(centroids)
 
     def validate(self):
-        
+
 
 if __name__ == '__main__':
 
