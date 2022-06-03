@@ -3,6 +3,8 @@ import os.path as osp
 import pandas as pd
 import numpy as np
 
+from ctypes import cdll, c_short, POINTER
+
 def load_skab(fpath):
     df = pd.read_csv(fpath, delimiter=';')
     keys = [item for item in df.keys()]
@@ -80,6 +82,29 @@ def simple_features(X):
     ])
     return E
 
+def fix_fft(x, m=5, n_fft_features=16, fpath='libraries/fix_fft_32k_dll/fix_fft_32k.so'):
+    ff = cdll.LoadLibrary(fpath)
+    ff.fix_fft.argtypes = [POINTER(c_short), POINTER(c_short), c_short, c_short]
+    n = x.shape[0]
+    x = [np.array(x[:, i], dtype=int) for i in range(x.shape[1])]
+    def fft(re):
+        im = [0 for _ in range(n)]
+        re_c = (c_short * n)(*re)
+        im_c = (c_short * n)(*im)
+        ff.fix_fft(re_c, im_c, c_short(m), c_short(0))
+        s = np.zeros(n_fft_features)
+        for i in range(n_fft_features):
+            s[i] = np.round(np.sqrt(re_c[i] * re_c[i] + im_c[i] * im_c[i]) // 2)
+        return s
+    mgn = map(fft, x)
+    return np.transpose(np.vstack(mgn))
+
+def fft_features(X):
+    assert len(X.shape) == 3
+    spectrogram = fix_fft(X[0, :, :])
+    E = [fix_fft(x) for x in X]
+    return simple_features(np.stack(E))
+
 def load_dataset(data_dir, series_len, labels, feature_extractor='simple_features'):
     sample_subdirs = [subdir for subdir in os.listdir(data_dir) if osp.isdir(osp.join(data_dir, subdir))]
     X, Y = [], []
@@ -87,10 +112,25 @@ def load_dataset(data_dir, series_len, labels, feature_extractor='simple_feature
         for label_val in labels[label_key]:
             if label_val in sample_subdirs:
                 sample_files = os.listdir(osp.join(data_dir, label_val))
+
+                if 'baseline.csv' in sample_files:
+                    #print('Baseline found!')
+                    fpath = osp.join(osp.join(data_dir, label_val), 'baseline.csv')
+                    x = pd.read_csv(fpath, header=None, dtype=np.float).values
+                    b_mean = np.mean(x, 0)
+                    #print(label_val, 'baseline', np.mean(x, 0), np.std(x, 0), np.min(x, 0), np.max(x, 0))
+                    subtract_mean = True
+                else:
+                    subtract_mean = False
+
                 for sf in sample_files:
                     fpath = osp.join(osp.join(data_dir, label_val), sf)
                     if osp.isfile(fpath) and fpath.endswith('.csv'):
-                        x = pd.read_csv(fpath, header=None).values
+                        x = pd.read_csv(fpath, header=None, dtype=np.float).values
+                        #print(label_val, np.mean(x, 0), np.std(x, 0), np.min(x, 0), np.max(x, 0))
+                        if subtract_mean:
+                            x -= b_mean[None, :]
+                        #print(label_val, 'baseline subtracted', np.mean(x, 0), np.std(x, 0), np.min(x, 0), np.max(x, 0))
                         n = x.shape[0]
                         y = np.ones((n, 1)) * label_key
                         n_series = n // series_len

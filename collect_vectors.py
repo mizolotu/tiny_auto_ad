@@ -34,39 +34,71 @@ if __name__ == '__main__':
     parser.add_argument('-r', '--rate', help='Baud rate', default=115200, type=int)
     parser.add_argument('-s', '--start', help='Start marker', default=60, type=int)
     parser.add_argument('-e', '--end', help='End marker', default=62, type=int)
-    parser.add_argument('-n', '--nvectors', help='Number of vectors to record', default=2000, type=int)
-    parser.add_argument('-f', '--fpath', help='File path', default='data/xyz_bearing/sand/300_300.csv')
+    parser.add_argument('-b', '--baseline', help='Number of vectors to record as a baseline', default=500, type=int)
+    parser.add_argument('-n', '--nvectors', help='Number of vectors to record', default=2500, type=int)
+    parser.add_argument('-f', '--fnames', help='File names', nargs='+', default=['0_0', '100_100', '200_200', '300_300', '400_400', '500_500'])
+    parser.add_argument('-l', '--label', help='File path', default='sand')
+    parser.add_argument('-d', '--directory', help='Directory to store the dataset', default='data/bearing')
     args = parser.parse_args()
 
-    sleep(5)
-
-    # record the data
 
     ser = serial.Serial(args.port, args.rate)
-    data = []
 
-    n = 0
-    while n < args.nvectors:
-        x, msg = receive_vector(args.start, args.end)
-        if x is not None:
-            print(n, x)
-            data.append(x)
-            n += 1
+    for fname in args.fnames:
+
+        input('Press Enter to record the next file...')
+
+        # record the baseline
+
+        if args.baseline is not None and args.baseline > 0:
+            data = []
+            n = 0
+            while n < args.baseline:
+                x, msg = receive_vector(args.start, args.end)
+                if x is not None:
+                    print(n, x)
+                    data.append(x)
+                    n += 1
+                else:
+                    print(msg)
+            B = np.array(data)
+            b_mean = np.mean(B, 0)
+
+            print('Baseline data samples have been recorded!')
+            input('Press Enter to continue...')
+
         else:
-            print(msg)
+            b_mean = None
+
+        # record the data
+
+        data = []
+
+        n = 0
+        while n < args.nvectors:
+            x, msg = receive_vector(args.start, args.end)
+            if x is not None:
+                print(n, x)
+                data.append(x)
+                n += 1
+            else:
+                print(msg)
+        X = np.array(data)
+
+        if b_mean is not None:
+            X -= b_mean[None, :]
+
+        # save the data
+
+        fpath = osp.join(args.directory, args.label, f'{fname}.csv')
+        dpath = osp.dirname(fpath)
+        dirs = []
+        while dpath != '':
+            dirs.append(dpath)
+            dpath = osp.dirname(dpath)
+        for dir in dirs[::-1]:
+            if not osp.isdir(dir):
+                os.mkdir(dir)
+        pandas.DataFrame(X).to_csv(fpath, header=None, index=None)
+
     ser.close()
-    X = np.array(data)
-
-    # save the data
-
-    fpath = osp.dirname(args.fpath)
-    dirs = []
-    while fpath != '':
-        dirs.append(fpath)
-        fpath = osp.dirname(fpath)
-    for dir in dirs[::-1]:
-        if not osp.isdir(dir):
-            os.mkdir(dir)
-    pandas.DataFrame(X).to_csv(args.fpath, header=None, index=None)
-
-
