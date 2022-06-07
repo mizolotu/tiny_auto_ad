@@ -19,7 +19,7 @@ if __name__ == '__main__':
         labels = {0: ['normal'], 1: ['crack', 'sand']}
 
     data_fpath = osp.join(DATA_DIR, dataset)
-    target_dataset = load_dataset(data_fpath, series_len=64, labels=labels, feature_extractor=None)
+    target_dataset = load_dataset(data_fpath, series_len=128, labels=labels, feature_extractor='simple_features')
     data = split_data(target_dataset, train_on_normal=True, shuffle_features=False)
 
     inp_shape = data['tr'][0].shape[1:]
