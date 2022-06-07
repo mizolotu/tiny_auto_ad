@@ -101,9 +101,10 @@ def fix_fft(x, m=5, n_fft_features=16, fpath='libraries/fix_fft_32k_dll/fix_fft_
 
 def fft_features(X):
     assert len(X.shape) == 3
-    spectrogram = fix_fft(X[0, :, :])
     E = [fix_fft(x) for x in X]
-    return simple_features(np.stack(E))
+    #return simple_features(np.stack(E))
+    return np.stack(E)
+
 
 def load_dataset(data_dir, series_len, labels, feature_extractor='simple_features'):
     sample_subdirs = [subdir for subdir in os.listdir(data_dir) if osp.isdir(osp.join(data_dir, subdir))]
@@ -114,11 +115,9 @@ def load_dataset(data_dir, series_len, labels, feature_extractor='simple_feature
                 sample_files = os.listdir(osp.join(data_dir, label_val))
 
                 if 'baseline.csv' in sample_files:
-                    #print('Baseline found!')
                     fpath = osp.join(osp.join(data_dir, label_val), 'baseline.csv')
                     x = pd.read_csv(fpath, header=None, dtype=np.float).values
                     b_mean = np.mean(x, 0)
-                    #print(label_val, 'baseline', np.mean(x, 0), np.std(x, 0), np.min(x, 0), np.max(x, 0))
                     subtract_mean = True
                 else:
                     subtract_mean = False
@@ -127,10 +126,8 @@ def load_dataset(data_dir, series_len, labels, feature_extractor='simple_feature
                     fpath = osp.join(osp.join(data_dir, label_val), sf)
                     if osp.isfile(fpath) and fpath.endswith('.csv'):
                         x = pd.read_csv(fpath, header=None, dtype=np.float).values
-                        #print(label_val, np.mean(x, 0), np.std(x, 0), np.min(x, 0), np.max(x, 0))
                         if subtract_mean:
                             x -= b_mean[None, :]
-                        #print(label_val, 'baseline subtracted', np.mean(x, 0), np.std(x, 0), np.min(x, 0), np.max(x, 0))
                         n = x.shape[0]
                         y = np.ones((n, 1)) * label_key
                         n_series = n // series_len
@@ -148,12 +145,13 @@ def load_dataset(data_dir, series_len, labels, feature_extractor='simple_feature
     X = X[idx, :]
     Y = Y[idx, :]
 
-    extract_features = globals()[feature_extractor]
-    X = extract_features(X)
+    if feature_extractor is not None:
+        extract_features = globals()[feature_extractor]
+        X = extract_features(X)
 
     return {'X': X, 'Y': Y}
 
-def split_data(dataset, inf_split=0.3, val_split=0.3):
+def split_data(dataset, inf_split=0.3, val_split=0.3, train_on_normal=False, shuffle_features=True):
 
     n_features = np.prod(dataset['X'].shape[1:])
 
@@ -165,18 +163,30 @@ def split_data(dataset, inf_split=0.3, val_split=0.3):
     split['val'], split['tr'] = np.split(train_val, [int(val_split * len(train_val))])
 
     idx1 = np.where(dataset['Y'] == 1)[0]
-    idx1 = np.random.choice(idx1, len(split['inf']), replace=True)
-    split['inf'] = np.append(split['inf'], idx1)
+
+    if train_on_normal:
+        split1 = {}
+        split1['inf'], train_val = np.split(idx1, [int(inf_split * len(idx1))])
+        split1['val'], split1['tr'] = np.split(train_val, [int(val_split * len(train_val))])
+        for key in split.keys():
+            idx1_key = np.random.choice(idx1, len(split1[key]), replace=True)
+            split[key] = np.append(split[key], idx1_key)
+    else:
+        idx1 = np.random.choice(idx1, len(split['inf']), replace=True)
+        split['inf'] = np.append(split['inf'], idx1)
 
     idx = np.arange(dataset['X'].shape[1])
-    np.random.shuffle(idx)
-    idx = idx[:n_features]
+    if shuffle_features:
+        np.random.shuffle(idx)
+        idx = idx[:n_features]
 
     X = dataset['X'][:, idx]
     Y = dataset['Y'].squeeze()
     data = {}
 
     for key in split.keys():
+        idx = split[key]
+        np.random.shuffle(idx)
         data[key] = [X[split[key], :], Y[split[key]]]
 
     return  data
