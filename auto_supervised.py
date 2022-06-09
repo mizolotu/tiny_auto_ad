@@ -25,9 +25,9 @@ if __name__ == '__main__':
 
     parser = arp.ArgumentParser(description='Test supervised methods.')
     parser.add_argument('-d', '--dataset', help='Dataset name', default='bearing', choices=['fan', 'bearing'])
-    parser.add_argument('-t', '--trials', help='Number of trials', default=10, type=int)
+    parser.add_argument('-t', '--trials', help='Number of trials', default=1, type=int)
     parser.add_argument('-g', '--gpu', help='GPU', default='-1')
-    parser.add_argument('-f', '--features', help='Feature extractor', default='simple_features')
+    parser.add_argument('-f', '--features', help='Feature extractor')
     args = parser.parse_args()
 
     if args.gpu is None:
