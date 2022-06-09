@@ -67,7 +67,7 @@ def load_odds(fpath):
         Y = Y.reshape(-1, 1)
     return X, Y
 
-def simple_features(X):
+def peaks_and_moments(X):
     assert len(X.shape) == 3
     m = X.shape[2]
     I = np.ones((m, m))
@@ -99,20 +99,19 @@ def fix_fft(x, m=5, n_fft_features=16, fpath='libraries/fix_fft_32k_dll/fix_fft_
     mgn = map(fft, x)
     return np.transpose(np.vstack(mgn))
 
-def fft_features(X):
+def fft(X, xmin=-32768, xmax=32767):
     assert len(X.shape) == 3
-    xmin = np.min(X)
-    xmax = np.max(X)
-    X = (X - xmin) / (xmax - xmin + 1e-10)
-    X = X * 65535 - 32768
+    x_min = np.min(X)
+    x_max = np.max(X)
+    X = (X - x_min) / (x_max - x_min + 1e-10)
+    X = X * (xmax - xmin) + xmin
     X = np.round(X)
-    X = np.clip(X, -32768, 32767)
+    X = np.clip(X, xmin, xmax)
     E = [fix_fft(x) for x in X]
-    #return simple_features(np.stack(E))
     return np.stack(E)
 
 
-def load_dataset(data_dir, series_len, labels, feature_extractor='simple_features'):
+def load_dataset(data_dir, series_len, labels, feature_extractors=[]):
     sample_subdirs = [subdir for subdir in os.listdir(data_dir) if osp.isdir(osp.join(data_dir, subdir))]
     X, Y = [], []
     for label_key in labels:
@@ -151,7 +150,7 @@ def load_dataset(data_dir, series_len, labels, feature_extractor='simple_feature
     X = X[idx, :]
     Y = Y[idx, :]
 
-    if feature_extractor is not None:
+    for feature_extractor in feature_extractors:
         extract_features = globals()[feature_extractor]
         X = extract_features(X)
 
