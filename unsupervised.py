@@ -365,7 +365,7 @@ if __name__ == '__main__':
         labels = {0: ['normal'], 1: ['crack', 'sand']}
 
     data_fpath = osp.join(DATA_DIR, dataset)
-    target_dataset = load_dataset(data_fpath, series_len=32, series_step=4, labels=labels, feature_extractors=['pam'])
+    target_dataset = load_dataset(data_fpath, series_len=32, series_step=4, labels=labels, feature_extractors=['fft', 'pam'])
     data = split_data(target_dataset, shuffle_features=False)
 
     cluster_range = [2, 3, 4, 5, 6, 7, 8, 9, 10]
