@@ -114,7 +114,7 @@ def fft(X, xmin=-32768, xmax=32767):
     return np.stack(E)
 
 
-def load_dataset(data_dir, series_len, labels, series_step=1, feature_extractors=[], seed=0, check_baseline=False):
+def load_dataset(data_dir, series_len, series_step, labels, feature_extractors=[], seed=0, check_baseline=False):
     np.random.seed(seed)
     sample_subdirs = [subdir for subdir in os.listdir(data_dir) if osp.isdir(osp.join(data_dir, subdir))]
     X, Y = [], []

@@ -42,11 +42,10 @@ if __name__ == '__main__':
         labels = {0: ['normal'], 1: ['crack', 'sand']}
 
     data_fpath = osp.join(DATA_DIR, dataset)
-    target_dataset = load_dataset(data_fpath, series_len=32, labels=labels, feature_extractors=args.feature_extrators)
+    target_dataset = load_dataset(data_fpath, series_len=32, series_step=4, labels=labels, feature_extractors=args.feature_extrators)
     data = split_data(target_dataset, train_on_normal=True, shuffle_features=False)
 
     inp_shape = data['tr'][0].shape[1:]
-    print(inp_shape)
 
     n_tr = data['tr'][0].shape[0]
     x_tr = np.reshape(data['tr'][0], newshape=(n_tr, np.prod(inp_shape)))
@@ -55,7 +54,7 @@ if __name__ == '__main__':
     n_inf = data['inf'][0].shape[0]
     x_inf = np.reshape(data['inf'][0], newshape=(n_inf, np.prod(inp_shape)))
 
-    print(n_tr, n_val, n_inf)
+    print(n_tr, n_val, n_inf, inp_shape)
 
     input_node = ak.StructuredDataInput()
     output_node = ak.Normalization()(input_node)
@@ -71,14 +70,15 @@ if __name__ == '__main__':
         project_name=project_name,
         inputs=input_node,
         outputs=output_node,
-        objective='val_binary_accuracy',
+        #objective='val_binary_accuracy',
+        objective='val_loss',
         overwrite=True,
         max_trials=args.trials
     )
     clf.fit(
         x_tr, data['tr'][1],
         validation_data=(x_val, data['val'][1]),
-        epochs=2500,
+        epochs=1000,
         batch_size=512,
         callbacks=[
             tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=100, mode='min', restore_best_weights=True)
