@@ -1,3 +1,4 @@
+import os
 import numpy as np
 import argparse as arp
 import os.path as osp
@@ -25,7 +26,13 @@ if __name__ == '__main__':
     parser = arp.ArgumentParser(description='Test supervised methods.')
     parser.add_argument('-d', '--dataset', help='Dataset name', default='bearing', choices=['fan', 'bearing'])
     parser.add_argument('-t', '--trials', help='Number of trials', default=1, type=int)
+    parser.add_argument('-g', '--gpu', help='GPU', default='-1')
     args = parser.parse_args()
+
+    if args.gpu is None:
+        os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
+    else:
+        os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
 
     dataset = args.dataset
     if dataset == 'fan':
@@ -70,8 +77,7 @@ if __name__ == '__main__':
     )
 
     model = clf.export_model()
-
-    print(type(model))  # <class 'tensorflow.python.keras.engine.training.Model'>
+    model.summary()
 
     try:
         model.save("model_autokeras", save_format="tf")
