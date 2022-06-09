@@ -55,8 +55,7 @@ if __name__ == '__main__':
     n_inf = data['inf'][0].shape[0]
     x_inf = np.reshape(data['inf'][0], newshape=(n_inf, np.prod(inp_shape)))
 
-    xmin = np.min(x_tr, 0)
-    xmax = np.max(x_tr, 0)
+    print(n_tr, n_val, n_inf)
 
     input_node = ak.StructuredDataInput()
     output_node = ak.Normalization()(input_node)

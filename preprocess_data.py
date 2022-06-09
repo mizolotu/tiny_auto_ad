@@ -114,7 +114,8 @@ def fft(X, xmin=-32768, xmax=32767):
     return np.stack(E)
 
 
-def load_dataset(data_dir, series_len, labels, feature_extractors=[]):
+def load_dataset(data_dir, series_len, labels, series_step=1, feature_extractors=[], seed=0, check_baseline=False):
+    np.random.seed(seed)
     sample_subdirs = [subdir for subdir in os.listdir(data_dir) if osp.isdir(osp.join(data_dir, subdir))]
     X, Y = [], []
     for label_key in labels:
@@ -122,7 +123,7 @@ def load_dataset(data_dir, series_len, labels, feature_extractors=[]):
             if label_val in sample_subdirs:
                 sample_files = os.listdir(osp.join(data_dir, label_val))
 
-                if 'baseline.csv' in sample_files:
+                if check_baseline and 'baseline.csv' in sample_files:
                     fpath = osp.join(osp.join(data_dir, label_val), 'baseline.csv')
                     x = pd.read_csv(fpath, header=None, dtype=np.float).values
                     b_mean = np.mean(x, 0)
@@ -139,9 +140,9 @@ def load_dataset(data_dir, series_len, labels, feature_extractors=[]):
                         n = x.shape[0]
                         y = np.ones((n, 1)) * label_key
                         n_series = n // series_len
-                        for j in range(n_series):
-                            j = np.random.randint(0, n - series_len)
-                            s_x = x[j: j + series_len, :]
+                        for j in range(0, n - series_len, series_step):
+                            #j = np.random.randint(0, n - series_len)
+                            s_x = x[j : j + series_len, :]
                             s_y = y[j + series_len, 0]
                             X.append(s_x)
                             Y.append(s_y)
@@ -159,10 +160,11 @@ def load_dataset(data_dir, series_len, labels, feature_extractors=[]):
 
     return {'X': X, 'Y': Y}
 
-def split_data(dataset, inf_split=0.3, val_split=0.3, train_on_normal=False, shuffle_features=True):
+def split_data(dataset, inf_split=0.3, val_split=0.3, train_on_normal=False, shuffle_features=True, seed=0):
+
+    np.random.seed(seed)
 
     n_features = np.prod(dataset['X'].shape[1:])
-
     idx0 = np.where(dataset['Y'] == 0)[0]
     np.random.shuffle(idx0)
 
