@@ -27,7 +27,7 @@ if __name__ == '__main__':
     parser.add_argument('-d', '--dataset', help='Dataset name', default='bearing', choices=['fan', 'bearing'])
     parser.add_argument('-t', '--trials', help='Number of trials', default=1, type=int)
     parser.add_argument('-g', '--gpu', help='GPU', default='-1')
-    parser.add_argument('-f', '--feature_extrators', help='Feature extractors', nargs='+')
+    parser.add_argument('-f', '--feature_extrators', help='Feature extractors', nargs='+', default=['raw'])
     args = parser.parse_args()
 
     if args.gpu is None:

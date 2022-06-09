@@ -67,7 +67,10 @@ def load_odds(fpath):
         Y = Y.reshape(-1, 1)
     return X, Y
 
-def peaks_and_moments(X):
+def raw(X):
+    return X
+
+def pam(X):
     assert len(X.shape) == 3
     m = X.shape[2]
     I = np.ones((m, m))
