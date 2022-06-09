@@ -46,6 +46,7 @@ if __name__ == '__main__':
     data = split_data(target_dataset, train_on_normal=True, shuffle_features=False)
 
     inp_shape = data['tr'][0].shape[1:]
+    print(inp_shape)
 
     n_tr = data['tr'][0].shape[0]
     x_tr = np.reshape(data['tr'][0], newshape=(n_tr, np.prod(inp_shape)))
@@ -59,7 +60,7 @@ if __name__ == '__main__':
 
     input_node = ak.StructuredDataInput()
     output_node = ak.Normalization()(input_node)
-    if args.features is None:
+    if len(inp_shape) > 1:
         output_node = ReshapeBlock(shape=inp_shape)(output_node)
         output_node = ak.ConvBlock()(output_node)
     output_node = ak.DenseBlock()(output_node)
@@ -71,6 +72,7 @@ if __name__ == '__main__':
         project_name=project_name,
         inputs=input_node,
         outputs=output_node,
+        objective='val_binary_accuracy',
         overwrite=True,
         max_trials=args.trials
     )

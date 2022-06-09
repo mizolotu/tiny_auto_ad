@@ -101,6 +101,12 @@ def fix_fft(x, m=5, n_fft_features=16, fpath='libraries/fix_fft_32k_dll/fix_fft_
 
 def fft_features(X):
     assert len(X.shape) == 3
+    xmin = np.min(X)
+    xmax = np.max(X)
+    X = (X - xmin) / (xmax - xmin + 1e-10)
+    X = X * 65535 - 32768
+    X = np.round(X)
+    X = np.clip(X, -32768, 32767)
     E = [fix_fft(x) for x in X]
     #return simple_features(np.stack(E))
     return np.stack(E)
