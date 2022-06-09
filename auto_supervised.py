@@ -27,7 +27,7 @@ if __name__ == '__main__':
     parser.add_argument('-d', '--dataset', help='Dataset name', default='bearing', choices=['fan', 'bearing'])
     parser.add_argument('-t', '--trials', help='Number of trials', default=1, type=int)
     parser.add_argument('-g', '--gpu', help='GPU', default='-1')
-    parser.add_argument('-f', '--feature_extrators', help='Feature extractors', nargs='+', default=['raw'])
+    parser.add_argument('-f', '--feature_extractors', help='Feature extractors', nargs='+', default=['raw'])
     args = parser.parse_args()
 
     if args.gpu is None:
@@ -42,7 +42,7 @@ if __name__ == '__main__':
         labels = {0: ['normal'], 1: ['crack', 'sand']}
 
     data_fpath = osp.join(DATA_DIR, dataset)
-    target_dataset = load_dataset(data_fpath, series_len=32, series_step=4, labels=labels, feature_extractors=args.feature_extrators)
+    target_dataset = load_dataset(data_fpath, series_len=32, series_step=4, labels=labels, feature_extractors=args.feature_extractors)
     data = split_data(target_dataset, train_on_normal=True, shuffle_features=False)
 
     inp_shape = data['tr'][0].shape[1:]
@@ -64,7 +64,7 @@ if __name__ == '__main__':
     output_node = ak.DenseBlock()(output_node)
     output_node = ak.ClassificationHead(loss="binary_crossentropy", metrics=["binary_accuracy"])(output_node)
 
-    project_name = '_'.join(['automodel', args.dataset, *[str(fe) for fe in args.feature_extrators]])
+    project_name = '_'.join(['automodel', args.dataset, *[str(fe) for fe in args.feature_extractors]])
 
     clf = ak.AutoModel(
         project_name=project_name,
@@ -89,7 +89,7 @@ if __name__ == '__main__':
     model = clf.export_model()
     model.summary()
 
-    model_fpath = osp.join('model_autokeras', args.dataset, *[str(fe) for fe in args.feature_extrators])
+    model_fpath = osp.join('model_autokeras', args.dataset, *[str(fe) for fe in args.feature_extractors])
     model.save(model_fpath)
 
     loaded_model = tf.keras.models.load_model(model_fpath, custom_objects=ak.CUSTOM_OBJECTS)
