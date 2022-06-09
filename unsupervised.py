@@ -45,7 +45,7 @@ class CentroidClusteringAnomalyDetector:
             predictions = None
         return predictions
 
-    def evaluate(self, data, alpha_range=np.arange(0, 10, 0.01)):
+    def evaluate(self, data, alpha_range=np.arange(0, 10, 0.01), fpr_max=1.0):
 
         alpha_best, fpr_, tpr_ = None, None, None
         acc_max = 0
@@ -58,13 +58,13 @@ class CentroidClusteringAnomalyDetector:
                 tpr = len(np.where((predictions == 1) & (data[1] == 1))[0]) / (1e-10 + len(np.where(data[1] == 1)[0]))
 
                 #print(acc, alpha, len(np.where(predictions == 0)[0]), len(np.where(predictions == 1)[0]))
-                if acc > acc_max:
+                if acc > acc_max and fpr <= fpr_max:
                     acc_max = acc
                     alpha_best = alpha
                     fpr_ = fpr
                     tpr_ = tpr
             else:
-                acc_max, fpr_, tpr_ = None, None, None
+                acc_max, fpr_, tpr_ = 0, 0, 0
                 alpha_best = None
                 break
 
@@ -370,6 +370,7 @@ if __name__ == '__main__':
 
     cluster_range = [2, 3, 4, 5, 6, 7, 8, 9, 10]
     n_tries = 10
+    fpr_max = 0.0
 
     for i in args.methods:
         method = locals()[methods[i]]
@@ -380,7 +381,7 @@ if __name__ == '__main__':
             alpha_best = None
             for j in range(n_tries):
                 m.fit(data['tr'], n_clusters=n_clusters, data_rad=data['val'])
-                acc, alpha, fpr, tpr = m.evaluate(data['inf'])
+                acc, alpha, fpr, tpr = m.evaluate(data['inf'], fpr_max=fpr_max)
                 acc_sum += acc
                 fpr_sum += fpr
                 tpr_sum += tpr
