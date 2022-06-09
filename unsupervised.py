@@ -388,7 +388,7 @@ if __name__ == '__main__':
                 if acc > acc_max:
                     acc_max = acc
                     alpha_best = alpha
-            if acc_sum > acc_method:
-                acc_method = acc_sum
-                m.tsne_plot(data['inf'], prefix=dataset)
+            #if acc_sum > acc_method:
+            #    acc_method = acc_sum
+            #    m.tsne_plot(data['inf'], prefix=dataset)
             print(f'{m.__class__.__name__} with {n_clusters} clusters and hyperparameter {alpha}: acc = {acc_sum / n_tries}, fpr = {fpr_sum / n_tries}, tpr = {tpr_sum / n_tries}')
