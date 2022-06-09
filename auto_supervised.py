@@ -81,12 +81,11 @@ if __name__ == '__main__':
     model = clf.export_model()
     model.summary()
 
-    try:
-        model.save("model_autokeras", save_format="tf")
-    except Exception:
-        model.save("model_autokeras.h5")
 
-    loaded_model = tf.keras.models.load_model("model_autokeras", custom_objects=ak.CUSTOM_OBJECTS)
+    model_fpath = osp.join('model_autokeras', args.dataset, args.features)
+    model.save(model_fpath)
+
+    loaded_model = tf.keras.models.load_model(model_fpath, custom_objects=ak.CUSTOM_OBJECTS)
 
     h = clf.evaluate(x_inf, data['inf'][1])
     print(h)
