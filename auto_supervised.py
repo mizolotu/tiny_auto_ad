@@ -27,6 +27,7 @@ if __name__ == '__main__':
     parser.add_argument('-d', '--dataset', help='Dataset name', default='bearing', choices=['fan', 'bearing'])
     parser.add_argument('-t', '--trials', help='Number of trials', default=100, type=int)
     parser.add_argument('-g', '--gpu', help='GPU', default='-1')
+    parser.add_argument('-f', '--features', help='Feature extractor')
     args = parser.parse_args()
 
     if args.gpu is None:
@@ -40,10 +41,8 @@ if __name__ == '__main__':
     elif dataset == 'bearing':
         labels = {0: ['normal'], 1: ['crack', 'sand']}
 
-    feature_extractor = 'simple_features'
-
     data_fpath = osp.join(DATA_DIR, dataset)
-    target_dataset = load_dataset(data_fpath, series_len=32, labels=labels, feature_extractor=feature_extractor)
+    target_dataset = load_dataset(data_fpath, series_len=32, labels=labels, feature_extractor=args.features)
     data = split_data(target_dataset, train_on_normal=True, shuffle_features=False)
 
     inp_shape = data['tr'][0].shape[1:]
@@ -59,9 +58,9 @@ if __name__ == '__main__':
     xmax = np.max(x_tr, 0)
 
     input_node = ak.StructuredDataInput()
-    output_node = ReshapeBlock(shape=inp_shape)(input_node)
-    output_node = ak.Normalization()(output_node)
-    if feature_extractor is None:
+    output_node = ak.Normalization()(input_node)
+    if args.features is None:
+        output_node = ReshapeBlock(shape=inp_shape)(output_node)
         output_node = ak.ConvBlock()(output_node)
     output_node = ak.DenseBlock()(output_node)
     output_node = ak.ClassificationHead(loss="binary_crossentropy", metrics=["binary_accuracy"])(output_node)
