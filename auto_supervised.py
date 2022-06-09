@@ -65,7 +65,7 @@ if __name__ == '__main__':
     output_node = ak.DenseBlock()(output_node)
     output_node = ak.ClassificationHead(loss="binary_crossentropy", metrics=["binary_accuracy"])(output_node)
 
-    project_name = '_'.join(['automodel', args.dataset, args.features])
+    project_name = '_'.join(['automodel', args.dataset, str(args.features)])
 
     clf = ak.AutoModel(
         project_name=project_name,
@@ -88,7 +88,7 @@ if __name__ == '__main__':
     model = clf.export_model()
     model.summary()
 
-    model_fpath = osp.join('model_autokeras', args.dataset, args.features)
+    model_fpath = osp.join('model_autokeras', args.dataset, str(args.features))
     model.save(model_fpath)
 
     loaded_model = tf.keras.models.load_model(model_fpath, custom_objects=ak.CUSTOM_OBJECTS)
