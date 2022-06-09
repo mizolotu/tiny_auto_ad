@@ -25,9 +25,9 @@ if __name__ == '__main__':
 
     parser = arp.ArgumentParser(description='Test supervised methods.')
     parser.add_argument('-d', '--dataset', help='Dataset name', default='bearing', choices=['fan', 'bearing'])
-    parser.add_argument('-t', '--trials', help='Number of trials', default=100, type=int)
+    parser.add_argument('-t', '--trials', help='Number of trials', default=10, type=int)
     parser.add_argument('-g', '--gpu', help='GPU', default='-1')
-    parser.add_argument('-f', '--features', help='Feature extractor')
+    parser.add_argument('-f', '--features', help='Feature extractor', default='simple_features')
     args = parser.parse_args()
 
     if args.gpu is None:
@@ -64,8 +64,15 @@ if __name__ == '__main__':
         output_node = ak.ConvBlock()(output_node)
     output_node = ak.DenseBlock()(output_node)
     output_node = ak.ClassificationHead(loss="binary_crossentropy", metrics=["binary_accuracy"])(output_node)
+
+    project_name = '_'.join(['automodel', args.dataset, args.features])
+
     clf = ak.AutoModel(
-        inputs=input_node, outputs=output_node, overwrite=True, max_trials=args.trials
+        project_name=project_name,
+        inputs=input_node,
+        outputs=output_node,
+        overwrite=True,
+        max_trials=args.trials
     )
     clf.fit(
         x_tr, data['tr'][1],
@@ -75,12 +82,11 @@ if __name__ == '__main__':
         callbacks=[
             tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=100, mode='min', restore_best_weights=True)
         ],
-        verbose=False
+        verbose=1
     )
 
     model = clf.export_model()
     model.summary()
-
 
     model_fpath = osp.join('model_autokeras', args.dataset, args.features)
     model.save(model_fpath)

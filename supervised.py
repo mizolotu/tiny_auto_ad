@@ -19,7 +19,7 @@ if __name__ == '__main__':
         labels = {0: ['normal'], 1: ['crack', 'sand']}
 
     data_fpath = osp.join(DATA_DIR, dataset)
-    target_dataset = load_dataset(data_fpath, series_len=128, labels=labels, feature_extractor='simple_features')
+    target_dataset = load_dataset(data_fpath, series_len=32, labels=labels, feature_extractor='simple_features')
     data = split_data(target_dataset, train_on_normal=True, shuffle_features=False)
 
     inp_shape = data['tr'][0].shape[1:]
@@ -27,19 +27,20 @@ if __name__ == '__main__':
     xmax = np.max(data['tr'][0], 0)
 
     inputs = tf.keras.layers.Input(shape=inp_shape)
-    hidden = (inputs - xmin) / (xmax - xmin + 1e-10)
+    #hidden = (inputs - xmin) / (xmax - xmin + 1e-10)
+    hidden = tf.keras.layers.Normalization()(inputs)
     if len(inp_shape) == 2:
         hidden = tf.keras.layers.Conv1D(filters=64, kernel_size=4, strides=1, activation='relu')(hidden)
         hidden = tf.keras.layers.Dropout(0.5)(hidden)
     hidden = tf.keras.layers.Flatten()(hidden)
-    hidden = tf.keras.layers.Dense(units=512, activation='relu')(hidden)
-    hidden = tf.keras.layers.Dropout(0.5)(hidden)
-    hidden = tf.keras.layers.Dense(units=512, activation='relu')(hidden)
-    hidden = tf.keras.layers.Dropout(0.5)(hidden)
+    hidden = tf.keras.layers.Dense(units=32, activation='relu')(hidden)
+    hidden = tf.keras.layers.Dropout(0.0)(hidden)
+    hidden = tf.keras.layers.Dense(units=32, activation='relu')(hidden)
+    hidden = tf.keras.layers.Dropout(0.0)(hidden)
     outputs = tf.keras.layers.Dense(1, activation='sigmoid')(hidden)
 
     model = tf.keras.models.Model(inputs, outputs)
-    model.compile(loss='binary_crossentropy', optimizer=tf.keras.optimizers.Adam(learning_rate=2.5e-4), metrics='binary_accuracy')
+    model.compile(loss='binary_crossentropy', optimizer=tf.keras.optimizers.Adam(learning_rate=1e-3), metrics='binary_accuracy')
     model.summary()
     model.fit(
         *data['tr'],
