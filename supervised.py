@@ -39,7 +39,7 @@ if __name__ == '__main__':
     outputs = tf.keras.layers.Dense(1, activation='sigmoid')(hidden)
 
     model = tf.keras.models.Model(inputs, outputs)
-    model.compile(loss='binary_crossentropy', optimizer=tf.keras.optimizers.Adam(learning_rate=1e-4), metrics='binary_accuracy')
+    model.compile(loss='binary_crossentropy', optimizer=tf.keras.optimizers.Adam(learning_rate=2.5e-4), metrics='binary_accuracy')
     model.summary()
     model.fit(
         *data['tr'],
