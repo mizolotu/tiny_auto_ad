@@ -9,6 +9,7 @@ import keras_tuner
 from preprocess_data import load_dataset, split_data
 from config import *
 from autokeras.utils import utils
+from sklearn.metrics import roc_auc_score
 
 class ReshapeBlock(ak.Block):
 
@@ -122,6 +123,7 @@ if __name__ == '__main__':
 
     #loaded_model = tf.keras.models.load_model(model_fpath, custom_objects=ak.CUSTOM_OBJECTS)
     p = clf.predict([x_inf, x_inf])
-    print(p[:10], data['inf'][1][:10])
+    auc = roc_auc_score(data['inf'][1], p)
+    print(auc)
     h = clf.evaluate([x_inf, x_inf], data['inf'][1])
     print(h)
