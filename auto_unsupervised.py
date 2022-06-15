@@ -50,7 +50,7 @@ class NoWeightsRegressionHead(ak.RegressionHead):
 
 class EarlyStoppingAtMaxAuc(tf.keras.callbacks.Callback):
 
-    def __init__(self, validation_data, patience=10, max_fpr=1.0):
+    def __init__(self, validation_data, patience=100, max_fpr=1.0):
         super(EarlyStoppingAtMaxAuc, self).__init__()
         self.patience = patience
         self.best_weights = None
