@@ -91,7 +91,7 @@ if __name__ == '__main__':
         output_node = ak.ConvBlock()(output_node)
     output_node = ak.DenseBlock()(output_node)
     output_node = DistanceBlock()([output_node, input_node2])
-    output_node = NoWeightsRegressionHead(loss="mean_squared_error", metrics=[tf.keras.metrics.AUC()])(output_node)
+    output_node = NoWeightsRegressionHead(loss="mean_squared_error", metrics=[tf.keras.metrics.AUC(from_logits=True)])(output_node)
 
     project_name = '_'.join(['automodel', args.dataset, *[str(fe) for fe in args.feature_extractors]])
 
