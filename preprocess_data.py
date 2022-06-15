@@ -160,7 +160,7 @@ def load_dataset(data_dir, series_len, series_step, labels, feature_extractors=[
 
     return {'X': X, 'Y': Y}
 
-def split_data(dataset, inf_split=0.3, val_split=0.3, train_on_normal=False, shuffle_features=True, seed=0):
+def split_data(dataset, inf_split=0.3, val_split=0.3, train_on_anomalies=False, validate_on_anomalies=False, shuffle_features=True, seed=0):
 
     np.random.seed(seed)
 
@@ -174,16 +174,20 @@ def split_data(dataset, inf_split=0.3, val_split=0.3, train_on_normal=False, shu
 
     idx1 = np.where(dataset['Y'] == 1)[0]
 
-    if train_on_normal:
-        split1 = {}
-        split1['inf'], train_val = np.split(idx1, [int(inf_split * len(idx1))])
-        split1['val'], split1['tr'] = np.split(train_val, [int(val_split * len(train_val))])
-        for key in split.keys():
+    split1 = {}
+    split1['inf'], train_val = np.split(idx1, [int(inf_split * len(idx1))])
+    split1['val'], split1['tr'] = np.split(train_val, [int(val_split * len(train_val))])
+
+    include1 = {
+        'tr': train_on_anomalies,
+        'val': validate_on_anomalies,
+        'inf': True
+    }
+
+    for key in split.keys():
+        if include1[key]:
             idx1_key = np.random.choice(idx1, len(split1[key]), replace=True)
             split[key] = np.append(split[key], idx1_key)
-    else:
-        idx1 = np.random.choice(idx1, len(split['inf']), replace=True)
-        split['inf'] = np.append(split['inf'], idx1)
 
     idx = np.arange(dataset['X'].shape[1])
     if shuffle_features:

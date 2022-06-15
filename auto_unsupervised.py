@@ -68,7 +68,7 @@ if __name__ == '__main__':
 
     data_fpath = osp.join(DATA_DIR, dataset)
     target_dataset = load_dataset(data_fpath, series_len=32, series_step=4, labels=labels, feature_extractors=args.feature_extractors)
-    data = split_data(target_dataset, train_on_normal=False, shuffle_features=False)
+    data = split_data(target_dataset, train_on_anomalies=False, validate_on_anomalies=True, shuffle_features=False)
 
     inp_shape = data['tr'][0].shape[1:]
 
@@ -98,7 +98,7 @@ if __name__ == '__main__':
         inputs=[input_node1, input_node2],
         outputs=output_node,
         #objective='val_binary_accuracy',
-        objective='val_loss',
+        objective='val_auc',
         overwrite=True,
         max_trials=args.trials
     )
@@ -108,7 +108,7 @@ if __name__ == '__main__':
         epochs=1000,
         batch_size=512,
         callbacks=[
-            tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=100, mode='min', restore_best_weights=True)
+            tf.keras.callbacks.EarlyStopping(monitor='val_auc', patience=100, mode='max', restore_best_weights=True)
         ],
         verbose=2
     )
