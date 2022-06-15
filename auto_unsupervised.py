@@ -145,7 +145,7 @@ if __name__ == '__main__':
         batch_size=512,
         callbacks=[
             #tf.keras.callbacks.EarlyStopping(monitor='val_auc', patience=100, mode='max', restore_best_weights=True)
-            EarlyStoppingAtMaxAuc(patience=100, validation_data=(x_val, data['val'][1]))
+            EarlyStoppingAtMaxAuc(validation_data=(x_val, data['val'][1]))
         ],
         verbose=2
     )
