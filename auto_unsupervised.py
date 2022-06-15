@@ -148,8 +148,7 @@ if __name__ == '__main__':
             #tf.keras.callbacks.EarlyStopping(monitor='val_auc', patience=100, mode='max', restore_best_weights=True)
             EarlyStoppingAtMaxAuc(validation_data=(x_val, data['val'][1]), patience=100)
         ],
-        verbose=2,
-        epochs=1000
+        verbose=2
     )
 
     model = clf.export_model()
