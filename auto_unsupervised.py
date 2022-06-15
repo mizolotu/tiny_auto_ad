@@ -29,7 +29,7 @@ class DistanceBlock(ak.Block):
 
     def build(self, hp, inputs=None):
         input_node1 = tf.nest.flatten(inputs)[0]
-        input_node2 = tf.nest.flatten(inputs)[1]
+        input_node2 = tf.cast(tf.nest.flatten(inputs)[1], tf.float32)
         layer = tf.keras.layers.Dense(
             hp.Int("num_units", min_value=input_node2.shape[1], max_value=input_node2.shape[1], step=32)
         )
