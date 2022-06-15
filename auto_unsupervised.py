@@ -75,12 +75,14 @@ class EarlyStoppingAtMaxAuc(tf.keras.callbacks.Callback):
                 self.model.stop_training = True
                 self.model.set_weights(self.best_weights)
 
-    def on_test_end(self, logs=None):
+    def on_test_end(self, logs):
         x, testy = self.validation_data
         predictions = self.model.predict([x, x])
         probs = predictions.flatten()
         self.current = roc_auc_score(testy, probs, max_fpr=self.max_fpr)
+        logs['val_auc'] = self.current
         print(f'\nValidation AUC:', self.current)
+
 
 if __name__ == '__main__':
 
@@ -125,7 +127,7 @@ if __name__ == '__main__':
         output_node = ak.ConvBlock()(output_node)
     output_node = ak.DenseBlock()(output_node)
     output_node = DistanceBlock()([output_node, input_node2])
-    output_node = NoWeightsRegressionHead(loss="mean_squared_error", metrics=[tf.keras.metrics.AUC(from_logits=True)])(output_node)
+    output_node = NoWeightsRegressionHead(loss="mean_squared_error", metrics=[tf.keras.metrics.AUC()])(output_node)
 
     project_name = '_'.join(['automodel', args.dataset, *[str(fe) for fe in args.feature_extractors]])
 
@@ -141,13 +143,13 @@ if __name__ == '__main__':
     clf.fit(
         [x_tr, x_tr], data['tr'][1],
         validation_data=([x_val, x_val], data['val'][1]),
-        epochs=1000,
         batch_size=512,
         callbacks=[
             #tf.keras.callbacks.EarlyStopping(monitor='val_auc', patience=100, mode='max', restore_best_weights=True)
-            EarlyStoppingAtMaxAuc(validation_data=(x_val, data['val'][1]))
+            EarlyStoppingAtMaxAuc(validation_data=(x_val, data['val'][1]), patience=100)
         ],
-        verbose=2
+        verbose=2,
+        epochs=1000
     )
 
     model = clf.export_model()
