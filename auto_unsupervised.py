@@ -50,12 +50,13 @@ class NoWeightsRegressionHead(ak.RegressionHead):
 
 class EarlyStoppingAtMaxAuc(tf.keras.callbacks.Callback):
 
-    def __init__(self, patience=10, max_fpr=1.0):
+    def __init__(self, validation_data, patience=10, max_fpr=1.0):
         super(EarlyStoppingAtMaxAuc, self).__init__()
         self.patience = patience
         self.best_weights = None
         self.current = -np.Inf
         self.max_fpr = max_fpr
+        self.validation_data = validation_data
 
     def on_train_begin(self, logs=None):
         self.wait = 0
@@ -75,14 +76,9 @@ class EarlyStoppingAtMaxAuc(tf.keras.callbacks.Callback):
                 self.model.set_weights(self.best_weights)
 
     def on_test_end(self, logs=None):
-        probs = []
-        testy = []
-        for x, y in self.validation_data:
-            y_labels = y[:, -1]
-            predictions = self.model.predict(x)
-            new_probs = predictions.flatten()
-            probs = np.hstack([probs, new_probs])
-            testy = np.hstack([testy, y_labels])
+        x, testy = self.validation_data
+        predictions = self.model.predict([x, x])
+        probs = predictions.flatten()
         self.current = roc_auc_score(testy, probs, max_fpr=self.max_fpr)
         print(f'\nValidation AUC:', self.current)
 
@@ -149,7 +145,7 @@ if __name__ == '__main__':
         batch_size=512,
         callbacks=[
             #tf.keras.callbacks.EarlyStopping(monitor='val_auc', patience=100, mode='max', restore_best_weights=True)
-            EarlyStoppingAtMaxAuc(patience=100)
+            EarlyStoppingAtMaxAuc(patience=100, validation_data=(x_val, data['val'][1]))
         ],
         verbose=2
     )
