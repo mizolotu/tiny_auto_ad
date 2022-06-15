@@ -35,7 +35,7 @@ class DistanceBlock(ak.Block):
             hp.Int("num_units", min_value=input_node2.shape[1], max_value=input_node2.shape[1], step=32)
         )
         output_node = layer(input_node1)
-        output_node = tf.expand_dims(tf.math.reduce_mean(tf.math.square(tf.math.subtract(output_node, input_node2)), axis=-1), -1)
+        output_node = tf.expand_dims(tf.math.reduce_sum(tf.math.square(tf.math.subtract(output_node, input_node2)), axis=-1), -1)
         return output_node
 
 class NoWeightsRegressionHead(ak.RegressionHead):
@@ -47,6 +47,44 @@ class NoWeightsRegressionHead(ak.RegressionHead):
         output_node = tf.keras.layers.Lambda(lambda x: x, name=self.name)(input_node)
         print(output_node)
         return output_node
+
+class EarlyStoppingAtMaxAuc(tf.keras.callbacks.Callback):
+
+    def __init__(self, patience=10, max_fpr=1.0):
+        super(EarlyStoppingAtMaxAuc, self).__init__()
+        self.patience = patience
+        self.best_weights = None
+        self.current = -np.Inf
+        self.max_fpr = max_fpr
+
+    def on_train_begin(self, logs=None):
+        self.wait = 0
+        self.stopped_epoch = 0
+        self.best = -np.Inf
+
+    def on_epoch_end(self, epoch, logs=None):
+        if np.greater(self.current, self.best):
+            self.best = self.current
+            self.wait = 0
+            self.best_weights = self.model.get_weights()
+        else:
+            self.wait += 1
+            if self.wait >= self.patience:
+                self.stopped_epoch = epoch
+                self.model.stop_training = True
+                self.model.set_weights(self.best_weights)
+
+    def on_test_end(self, logs=None):
+        probs = []
+        testy = []
+        for x, y in self.validation_data:
+            y_labels = y[:, -1]
+            predictions = self.model.predict(x)
+            new_probs = predictions.flatten()
+            probs = np.hstack([probs, new_probs])
+            testy = np.hstack([testy, y_labels])
+        self.current = roc_auc_score(testy, probs, max_fpr=self.max_fpr)
+        print(f'\nValidation AUC:', self.current)
 
 if __name__ == '__main__':
 
@@ -110,7 +148,8 @@ if __name__ == '__main__':
         epochs=1000,
         batch_size=512,
         callbacks=[
-            tf.keras.callbacks.EarlyStopping(monitor='val_auc', patience=100, mode='max', restore_best_weights=True)
+            #tf.keras.callbacks.EarlyStopping(monitor='val_auc', patience=100, mode='max', restore_best_weights=True)
+            EarlyStoppingAtMaxAuc(patience=100)
         ],
         verbose=2
     )
