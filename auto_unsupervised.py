@@ -4,6 +4,7 @@ import argparse as arp
 import os.path as osp
 import tensorflow as tf
 import autokeras as ak
+import keras_tuner
 
 from preprocess_data import load_dataset, split_data
 from config import *
@@ -98,7 +99,7 @@ if __name__ == '__main__':
         inputs=[input_node1, input_node2],
         outputs=output_node,
         #objective='val_binary_accuracy',
-        objective='val_auc',
+        objective=keras_tuner.Objective("val_auc", direction="max"),
         overwrite=True,
         max_trials=args.trials
     )
