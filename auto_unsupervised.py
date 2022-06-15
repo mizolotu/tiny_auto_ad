@@ -29,7 +29,7 @@ class DistanceBlock(ak.Block):
 
     def build(self, hp, inputs=None):
         input_node1 = tf.nest.flatten(inputs)[0]
-        input_node2 = tf.nest.flatten(inputs)[0]
+        input_node2 = tf.nest.flatten(inputs)[1]
         layer = tf.keras.layers.Dense(
             hp.Int("num_units", min_value=input_node2.shape[1], max_value=input_node2.shape[1], step=32)
         )
@@ -121,5 +121,7 @@ if __name__ == '__main__':
     #model.save(model_fpath)
 
     #loaded_model = tf.keras.models.load_model(model_fpath, custom_objects=ak.CUSTOM_OBJECTS)
+    p = clf.predict([x_inf, x_inf])
+    print(p[:10], data['inf'][1][:10])
     h = clf.evaluate([x_inf, x_inf], data['inf'][1])
     print(h)
