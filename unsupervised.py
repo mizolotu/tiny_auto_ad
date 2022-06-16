@@ -14,7 +14,7 @@ class CentroidClusteringAnomalyDetector:
     def __init__(self):
         self.trained = False
 
-    def _em(self, volume_support, s_U, s_X, n_generated, t_max=0.999, t_step=0.001):
+    def _em(self, volume_support, s_U, s_X, n_generated, t_max=0.99, t_step=0.01):
         t = np.arange(0, 1 / volume_support, t_step / volume_support)
         EM_t = np.zeros(t.shape[0])
         n_samples = s_X.shape[0]
@@ -145,7 +145,7 @@ class ScalableKmeans(CentroidClusteringAnomalyDetector):
     def __init__(self):
         super(ScalableKmeans, self).__init__()
 
-    def fit(self, data, data_rad, n_clusters, batch_size=16, l=4, n_iters=100):
+    def fit(self, data, data_rad, n_clusters, batch_size=16, l=4, n_iters=100, metric='em'):
 
         n_features = data[0].shape[1]
 
@@ -239,7 +239,7 @@ class ScalableKmeans(CentroidClusteringAnomalyDetector):
 
         self._calculate_distances(data_rad)
 
-        alpha, metric_val = self._set_radiuses(data[0])
+        alpha, metric_val = self._set_radiuses(data[0], metric=metric)
 
         self.trained = True
 
@@ -251,7 +251,7 @@ class ClustreamKmeans(CentroidClusteringAnomalyDetector):
     def __init__(self):
         super(ClustreamKmeans, self).__init__()
 
-    def fit(self, data, data_rad, n_clusters, n_micro_clusters=16, micro_cluster_radius_alpha=3, n_iters=100, eps=1e-10):
+    def fit(self, data, data_rad, n_clusters, n_micro_clusters=16, micro_cluster_radius_alpha=3, n_iters=100, eps=1e-10, metric='em'):
 
         ntr = data[0].shape[0]
         n_features = data[0].shape[1]
@@ -382,7 +382,7 @@ class ClustreamKmeans(CentroidClusteringAnomalyDetector):
 
         self._calculate_distances(data_rad)
 
-        alpha, metric_val = self._set_radiuses(data[0])
+        alpha, metric_val = self._set_radiuses(data[0], metric=metric)
 
         self.trained = True
 
@@ -544,6 +544,7 @@ if __name__ == '__main__':
     parser.add_argument('-i', '--methods', help='Method index', type=int, default=[0, 1], nargs='+', choices=[i for i in range(len(methods))])
     parser.add_argument('-t', '--tries', help='Number of tries', default=1, type=int)
     parser.add_argument('-c', '--clusters', help='Cluster range', default=[2, 3, 4, 5, 6, 7, 8, 9, 10], type=int, nargs='+')
+    parser.add_argument('-m', '--metric', help='Metric', default='em', choices=['em', 'mv'])
     args = parser.parse_args()
 
     dataset = args.dataset
@@ -566,7 +567,7 @@ if __name__ == '__main__':
         for n_clusters in cluster_range:
             acc_sum, fpr_sum, tpr_sum = 0, 0, 0
             for j in range(n_tries):
-                alpha, metric_val = m.fit(data['tr'], n_clusters=n_clusters, data_rad=data['val'])
+                alpha, metric_val = m.fit(data['tr'], n_clusters=n_clusters, data_rad=data['val'], metric=args.metric)
                 acc, fpr, tpr = m.evaluate(data['inf'], alpha)
                 acc_sum += acc
                 fpr_sum += fpr
