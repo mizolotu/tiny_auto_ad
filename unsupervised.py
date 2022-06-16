@@ -50,23 +50,27 @@ class CentroidClusteringAnomalyDetector:
         D_va = np.linalg.norm(E_va_[:, None, :] - C_[None, :, :], axis=-1)
         cl_labels_va = np.argmin(D_va, axis=1)
         dists_va = np.min(D_va, axis=1)
-        self.radiuses = np.zeros((C_.shape[0], 2))
+        self.radiuses = np.zeros((C_.shape[0], 3))
         for k in range(C_.shape[0]):
             idx = np.where(cl_labels_va == k)[0]
             if len(idx) > 0:
                 self.radiuses[k, 0] = np.mean(dists_va[idx])
                 self.radiuses[k, 1] = np.std(dists_va[idx])
+                self.radiuses[k, 2] = np.max(dists_va[idx])
             else:
                 self.radiuses[k, 0] = 0
                 self.radiuses[k, 1] = 0
+                self.radiuses[k, 2] = 0
 
-    def _set_radiuses(self, data, metric='em', alpha_range=np.arange(0, 10, 0.01), n_generated=100000):
+    def _set_radiuses(self, data, metric='em', alpha_max=10, alpha_step=0.1, n_generated=100000):
 
         n_features = data.shape[1]
         volume_support = (np.ones(n_features) - np.zeros(n_features)).prod()
         X_unif = np.random.uniform(np.zeros(n_features), np.ones(n_features), size=(n_generated, n_features))
         metric_fun = getattr(self, f'_{metric}')
-
+        alpha_min = np.max((self.radiuses[:, 2] - self.radiuses[:, 0]) / (self.radiuses[:, 1] + 1e-10))
+        print(alpha_min)
+        alpha_range = np.arange(alpha_min, alpha_max, alpha_step)
         metric_vals = np.zeros(len(alpha_range))
         for i, alpha in enumerate(alpha_range):
             _, s_X = self.predict(data, alpha)
