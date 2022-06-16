@@ -114,6 +114,7 @@ class CentroidClusteringAnomalyDetector:
                 (data[0] - self.xmin[None, :]) / (self.xmax[None, :] - self.xmin[None, :] + eps),
                 (self.centroids - self.xmin[None, :]) / (self.xmax[None, :] - self.xmin[None, :] + eps),
             ])
+            print(X_plot)
             tsne = TSNE(n_components=2, learning_rate='auto', init='random')
             X_tsne = tsne.fit_transform(X_plot)
             pp.style.use('default')
