@@ -568,7 +568,7 @@ if __name__ == '__main__':
             alpha_best = None
             for j in range(n_tries):
                 alpha, metric_val = m.fit(data['tr'], n_clusters=n_clusters, data_rad=data['val'])
-                acc, fpr, tpr = m.evaluate(data['inf'])
+                acc, fpr, tpr = m.evaluate(data['inf'], alpha)
                 acc_sum += acc
                 fpr_sum += fpr
                 tpr_sum += tpr
