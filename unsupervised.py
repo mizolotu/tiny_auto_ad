@@ -69,6 +69,7 @@ class CentroidClusteringAnomalyDetector:
         X_unif = np.random.uniform(np.zeros(n_features), np.ones(n_features), size=(n_generated, n_features))
         metric_fun = getattr(self, f'_{metric}')
         alpha = np.maximum(alpha, np.max((self.radiuses[:, 2] - self.radiuses[:, 0]) / (self.radiuses[:, 1] + 1e-10)))
+        print(alpha)
         _, s_X = self.predict(data, alpha)
         if s_X is not None:
             _, s_U = self.predict(X_unif, alpha, standardize=False)
