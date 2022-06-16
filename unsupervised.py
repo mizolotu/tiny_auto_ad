@@ -62,7 +62,7 @@ class CentroidClusteringAnomalyDetector:
                 self.radiuses[k, 1] = 0
                 self.radiuses[k, 2] = 0
 
-    def _set_radiuses(self, data, metric='em', alpha=7, n_generated=100000):
+    def _set_radiuses(self, data, metric='em', alpha=3, n_generated=100000):
 
         n_features = data.shape[1]
         volume_support = (np.ones(n_features) - np.zeros(n_features)).prod()
