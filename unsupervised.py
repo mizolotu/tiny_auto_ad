@@ -102,7 +102,7 @@ class CentroidClusteringAnomalyDetector:
         return predictions, scores
 
     def evaluate(self, data, alpha):
-        predictions = self.predict(data[0], alpha)
+        predictions, _ = self.predict(data[0], alpha)
         if predictions is not None:
             acc = len(np.where(predictions == data[1])[0]) / data[1].shape[0]
             fpr = len(np.where((predictions == 1) & (data[1] == 0))[0]) / (1e-10 + len(np.where(data[1] == 0)[0]))
