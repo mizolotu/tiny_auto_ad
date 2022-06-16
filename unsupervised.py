@@ -127,7 +127,8 @@ class CentroidClusteringAnomalyDetector:
                 loc=0
             )
             fname = f'{prefix}_' if prefix is not None else ''
-            fname += f'tsne_{self.__class__.__name__}_{nc}.pdf'
+            #fname += f'tsne_{self.__class__.__name__}_{nc}.pdf'
+            fname += 'tsne.pdf'
             pp.savefig(osp.join(fig_dir, fname))
             pp.close()
         else:
@@ -557,11 +558,11 @@ if __name__ == '__main__':
     cluster_range = args.clusters
     n_tries = args.tries
 
+    acc_best, tpr_best, fpr_best, metric_best, method_best, n_clusters_best = 0, 0, 0, 0, None, 0
     for i in args.methods:
         method = locals()[methods[i]]
         m = method()
         acc_method = 0
-        metric_vals = np.arange(len)
         for n_clusters in cluster_range:
             acc_sum, fpr_sum, tpr_sum, metric_sum = 0, 0, 0, 0
             for j in range(n_tries):
@@ -571,7 +572,24 @@ if __name__ == '__main__':
                 fpr_sum += fpr
                 tpr_sum += tpr
                 metric_sum += metric_val
-            #if acc_sum > acc_method:
-            #    acc_method = acc_sum
-            #    m.tsne_plot(data['inf'], prefix=dataset)
+
+            if method_best is None:
+                update_best = True
+            elif args.metric == 'em' and metric_sum / n_tries > metric_best:
+                update_best = True
+            elif args.metric == 'mv' and metric_sum / n_tries < metric_best:
+                update_best = True
+            else:
+                update_best = False
+
+            if update_best:
+                metric_best = metric_sum / n_tries
+                acc_best = acc_sum / n_tries
+                tpr_best = tpr_sum / n_tries
+                fpr_best = fpr_sum / n_tries
+                method_best = m.__class__.__name__
+                n_clusters_best = n_clusters
+                m.tsne_plot(data['inf'], prefix=dataset)
+
             print(f'{m.__class__.__name__} with {n_clusters} clusters on average: acc = {acc_sum / n_tries}, fpr = {fpr_sum / n_tries}, tpr = {tpr_sum / n_tries}, {args.metric} = {metric_sum / n_tries}')
+    print(f'The best is {method_best} with {n_clusters_best} clusters: acc = {acc_best}, fpr = {fpr_best}, tpr = {tpr_best}, {args.metric} = {metric_best}')
