@@ -72,7 +72,6 @@ class CentroidClusteringAnomalyDetector:
             _, s_X = self.predict(data, alpha)
             if s_X is not None:
                 _, s_U = self.predict(X_unif, alpha, standardize=False)
-                print(s_U, s_X)
                 metric_vals[i] = metric_fun(volume_support, s_U, s_X, n_generated)[0]
         if metric == 'em':
             alpha = alpha_range[np.argmax(metric_vals)]
@@ -543,6 +542,8 @@ if __name__ == '__main__':
     parser = arp.ArgumentParser(description='Test AD methods.')
     parser.add_argument('-d', '--dataset', help='Dataset name', default='fan', choices=['fan', 'bearing'])
     parser.add_argument('-i', '--methods', help='Method index', type=int, default=[0, 1], nargs='+', choices=[i for i in range(len(methods))])
+    parser.add_argument('-t', '--tries', help='Number of tries', default=1, type=int)
+    parser.add_argument('-c', '--clusters', help='Cluster range', default=[2, 3, 4, 5, 6, 7, 8, 9, 10], type=int, nargs='+')
     args = parser.parse_args()
 
     dataset = args.dataset
@@ -555,17 +556,15 @@ if __name__ == '__main__':
     target_dataset = load_dataset(data_fpath, series_len=32, series_step=32, labels=labels, feature_extractors=['pam'])
     data = split_data(target_dataset, shuffle_features=False)
 
-    cluster_range = [2, 3, 4, 5, 6, 7, 8, 9, 10]
-    n_tries = 10
-    fpr_max = 0.0
+    cluster_range = args.clusters
+    n_tries = args.tries
 
     for i in args.methods:
         method = locals()[methods[i]]
         m = method()
         acc_method = 0
         for n_clusters in cluster_range:
-            acc_max, acc_sum, fpr_sum, tpr_sum = 0, 0, 0, 0
-            alpha_best = None
+            acc_sum, fpr_sum, tpr_sum = 0, 0, 0
             for j in range(n_tries):
                 alpha, metric_val = m.fit(data['tr'], n_clusters=n_clusters, data_rad=data['val'])
                 acc, fpr, tpr = m.evaluate(data['inf'], alpha)
