@@ -75,9 +75,12 @@ class CentroidClusteringAnomalyDetector:
                 print(s_U, s_X)
                 metric_vals[i] = metric_fun(volume_support, s_U, s_X, n_generated)[0]
         if metric == 'em':
-            print(alpha_range[np.argmax(metric_vals)], np.max(metric_vals))
+            alpha = alpha_range[np.argmax(metric_vals)]
+            metric_val = np.max(metric_vals)
         elif metric == 'mv':
-            print(alpha_range[np.argmin(metric_vals)], np.min(metric_vals))
+            alpha = alpha_range[np.argmin(metric_vals)]
+            metric_val = np.min(metric_vals)
+        return alpha, metric_val
 
     def predict(self, data, alpha, eps=1e-10, standardize=True):
         if self.trained:
@@ -99,30 +102,16 @@ class CentroidClusteringAnomalyDetector:
             predictions, scores = None, None
         return predictions, scores
 
-    def evaluate(self, data, alpha_range=np.arange(0, 10, 0.01), fpr_max=1.0):
+    def evaluate(self, data, alpha):
+        predictions = self.predict(data[0], alpha)
+        if predictions is not None:
+            acc = len(np.where(predictions == data[1])[0]) / data[1].shape[0]
+            fpr = len(np.where((predictions == 1) & (data[1] == 0))[0]) / (1e-10 + len(np.where(data[1] == 0)[0]))
+            tpr = len(np.where((predictions == 1) & (data[1] == 1))[0]) / (1e-10 + len(np.where(data[1] == 1)[0]))
+        else:
+            acc, fpr, tpr = 0, 0, 0
 
-        alpha_best, fpr_, tpr_ = None, None, None
-        acc_max = 0
-
-        for alpha in alpha_range:
-            predictions = self.predict(data[0], alpha)
-            if predictions is not None:
-                acc = len(np.where(predictions == data[1])[0]) / data[1].shape[0]
-                fpr = len(np.where((predictions == 1) & (data[1] == 0))[0]) / (1e-10 + len(np.where(data[1] == 0)[0]))
-                tpr = len(np.where((predictions == 1) & (data[1] == 1))[0]) / (1e-10 + len(np.where(data[1] == 1)[0]))
-
-                #print(acc, alpha, len(np.where(predictions == 0)[0]), len(np.where(predictions == 1)[0]))
-                if acc > acc_max and fpr <= fpr_max:
-                    acc_max = acc
-                    alpha_best = alpha
-                    fpr_ = fpr
-                    tpr_ = tpr
-            else:
-                acc_max, fpr_, tpr_ = 0, 0, 0
-                alpha_best = None
-                break
-
-        return acc_max, alpha_best, fpr_, tpr_
+        return acc, fpr, tpr
 
     def tsne_plot(self, data, fig_dir=FIG_DIR, labels=['Normal', 'Defective'], prefix=None, eps=1e-10):
         if self.trained:
@@ -251,9 +240,11 @@ class ScalableKmeans(CentroidClusteringAnomalyDetector):
 
         self._calculate_distances(data_rad)
 
-        self._set_radiuses(data[0])
+        alpha, metric_val = self._set_radiuses(data[0])
 
         self.trained = True
+
+        return alpha, metric_val
 
 
 class ClustreamKmeans(CentroidClusteringAnomalyDetector):
@@ -392,9 +383,11 @@ class ClustreamKmeans(CentroidClusteringAnomalyDetector):
 
         self._calculate_distances(data_rad)
 
-        self._set_radiuses(data[0])
+        alpha, metric_val = self._set_radiuses(data[0])
 
         self.trained = True
+
+        return alpha, metric_val
 
 
 class WeightedAffinityPropagation(CentroidClusteringAnomalyDetector):
@@ -574,15 +567,12 @@ if __name__ == '__main__':
             acc_max, acc_sum, fpr_sum, tpr_sum = 0, 0, 0, 0
             alpha_best = None
             for j in range(n_tries):
-                m.fit(data['tr'], n_clusters=n_clusters, data_rad=data['val'])
-                acc, alpha, fpr, tpr = m.evaluate(data['inf'], fpr_max=fpr_max)
+                alpha, metric_val = m.fit(data['tr'], n_clusters=n_clusters, data_rad=data['val'])
+                acc, fpr, tpr = m.evaluate(data['inf'])
                 acc_sum += acc
                 fpr_sum += fpr
                 tpr_sum += tpr
-                if acc > acc_max:
-                    acc_max = acc
-                    alpha_best = alpha
             #if acc_sum > acc_method:
             #    acc_method = acc_sum
             #    m.tsne_plot(data['inf'], prefix=dataset)
-            print(f'{m.__class__.__name__} with {n_clusters} clusters and hyperparameter {alpha}: acc = {acc_sum / n_tries}, fpr = {fpr_sum / n_tries}, tpr = {tpr_sum / n_tries}')
+            print(f'{m.__class__.__name__} with {n_clusters} clusters and hyperparameter {alpha} (em/mv = {metric_val}): acc = {acc_sum / n_tries}, fpr = {fpr_sum / n_tries}, tpr = {tpr_sum / n_tries}')
