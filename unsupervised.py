@@ -114,7 +114,6 @@ class CentroidClusteringAnomalyDetector:
                 (data[0] - self.xmin[None, :]) / (self.xmax[None, :] - self.xmin[None, :] + eps),
                 (self.centroids - self.xmin[None, :]) / (self.xmax[None, :] - self.xmin[None, :] + eps),
             ])
-            print(X_plot)
             tsne = TSNE(n_components=2, learning_rate='auto', init='random')
             X_tsne = tsne.fit_transform(X_plot)
             pp.style.use('default')
@@ -591,7 +590,7 @@ if __name__ == '__main__':
                 fpr_best = fpr_sum / n_tries
                 method_best = m.__class__.__name__
                 n_clusters_best = n_clusters
-                m.tsne_plot(data['inf'], prefix=dataset)
+                #m.tsne_plot(data['inf'], prefix=dataset)
 
             print(f'{m.__class__.__name__} with {n_clusters} clusters on average: acc = {acc_sum / n_tries}, fpr = {fpr_sum / n_tries}, tpr = {tpr_sum / n_tries}, {args.metric} = {metric_sum / n_tries}')
     print(f'The best is {method_best} with {n_clusters_best} clusters: acc = {acc_best}, fpr = {fpr_best}, tpr = {tpr_best}, {args.metric} = {metric_best}')
