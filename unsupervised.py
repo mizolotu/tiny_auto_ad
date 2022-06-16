@@ -70,10 +70,10 @@ class CentroidClusteringAnomalyDetector:
         metric_fun = getattr(self, f'_{metric}')
         alpha = np.maximum(alpha, np.max((self.radiuses[:, 2] - self.radiuses[:, 0]) / (self.radiuses[:, 1] + 1e-10)))
         _, s_X = self.predict(data, alpha)
-        print(s_X)
-        if s_X is not None:
-            _, s_U = self.predict(X_unif, alpha, standardize=False)
-            metric_val = metric_fun(volume_support, s_U, s_X, n_generated)[0]
+        assert s_X is not None
+        _, s_U = self.predict(X_unif, alpha, standardize=False)
+        assert s_U is not None
+        metric_val = metric_fun(volume_support, s_U, s_X, n_generated)[0]
         return alpha, metric_val
 
     def predict(self, data, alpha, eps=1e-10, standardize=True):
@@ -235,9 +235,9 @@ class ScalableKmeans(CentroidClusteringAnomalyDetector):
 
         self._calculate_distances(data_rad)
 
-        alpha, metric_val = self._set_radiuses(data[0], metric=metric)
-
         self.trained = True
+
+        alpha, metric_val = self._set_radiuses(data[0], metric=metric)
 
         return alpha, metric_val
 
@@ -378,9 +378,9 @@ class ClustreamKmeans(CentroidClusteringAnomalyDetector):
 
         self._calculate_distances(data_rad)
 
-        alpha, metric_val = self._set_radiuses(data[0], metric=metric)
-
         self.trained = True
+
+        alpha, metric_val = self._set_radiuses(data[0], metric=metric)
 
         return alpha, metric_val
 
