@@ -72,6 +72,6 @@ if __name__ == '__main__':
         )
 
     model.summary()
-        
+
     h = model.evaluate(*data['inf'])
     print(h)

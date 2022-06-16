@@ -4,6 +4,7 @@ import os.path as osp
 
 from matplotlib import pyplot as pp
 from sklearn.manifold import TSNE
+from sklearn.metrics import auc, roc_auc_score, roc_curve
 from preprocess_data import load_dataset, split_data
 from config import *
 
@@ -12,6 +13,36 @@ class CentroidClusteringAnomalyDetector:
 
     def __init__(self):
         self.trained = False
+
+    def _em(self, volume_support, s_U, s_X, n_generated, t_max=0.999, t_step=0.001):
+        t = np.arange(0, 1 / volume_support, t_step / volume_support)
+        EM_t = np.zeros(t.shape[0])
+        n_samples = s_X.shape[0]
+        s_X_unique = np.unique(s_X)
+        EM_t[0] = 1.
+        for u in s_X_unique:
+            EM_t = np.maximum(EM_t, 1. / n_samples * (s_X > u).sum() - t * (s_U > u).sum() / n_generated * volume_support)
+        amax = np.argmax(EM_t <= t_max) + 1
+        if amax == 1:
+            amax = -1
+        AUC = auc(t[:amax], EM_t[:amax])
+        return AUC, EM_t, amax
+
+    def _mv(self, volume_support, s_U, s_X, n_generated, alpha_step=0.001, alpha_min=0.9, alpha_max=0.999):
+        axis_alpha = np.arange(alpha_min, alpha_max, alpha_step * (alpha_max - alpha_min))
+        n_samples = s_X.shape[0]
+        s_X_argsort = s_X.argsort()
+        mass = 0
+        cpt = 0
+        u = s_X[s_X_argsort[-1]]
+        mv = np.zeros(axis_alpha.shape[0])
+        for i in range(axis_alpha.shape[0]):
+            while mass < axis_alpha[i]:
+                cpt += 1
+                u = s_X[s_X_argsort[-cpt]]
+                mass = 1. / n_samples * cpt
+            mv[i] = float((s_U >= u).sum()) / n_generated * volume_support
+        return auc(axis_alpha, mv), mv
 
     def _calculate_distances(self, data, eps=1e-10):
         E_va_ = (data[0] - self.xmin[None, :]) / (self.xmax[None, :] - self.xmin[None, :] + eps)
@@ -29,10 +60,32 @@ class CentroidClusteringAnomalyDetector:
                 self.radiuses[k, 0] = 0
                 self.radiuses[k, 1] = 0
 
-    def predict(self, data, alpha, eps=1e-10):
+    def _set_radiuses(self, data, metric='em', alpha_range=np.arange(0, 10, 0.01), n_generated=10000):
+
+        n_features = data.shape[1]
+        volume_support = (np.ones(n_features) - np.zeros(n_features)).prod()
+        X_unif = np.random.uniform(np.zeros(n_features), np.ones(n_features), size=(n_generated, n_features))
+        metric_fun = getattr(self, f'_{metric}')
+
+        metric_vals = np.zeros(len(alpha_range))
+        for i, alpha in enumerate(alpha_range):
+            _, s_X = self.predict(data, alpha)
+            if s_X is not None:
+                _, s_U = self.predict(X_unif, alpha, standardize=False)
+                print(s_U, s_X)
+                metric_vals[i] = metric_fun(volume_support, s_U, s_X, n_generated)[0]
+        if metric == 'em':
+            print(alpha_range[np.argmax(metric_vals)], np.max(metric_vals))
+        elif metric == 'mv':
+            print(alpha_range[np.argmin(metric_vals)], np.min(metric_vals))
+
+    def predict(self, data, alpha, eps=1e-10, standardize=True):
         if self.trained:
             radiuses = self.radiuses[:, 0] + alpha * self.radiuses[:, 1]
-            E_te_ = (data[0] - self.xmin[None, :]) / (self.xmax[None, :] - self.xmin[None, :] + eps)
+            if standardize:
+                E_te_ = (data - self.xmin[None, :]) / (self.xmax[None, :] - self.xmin[None, :] + eps)
+            else:
+                E_te_ = data
             C_ = (self.centroids - self.xmin[None, :]) / (self.xmax[None, :] - self.xmin[None, :] + eps)
             D_te = np.linalg.norm(E_te_[:, None, :] - C_[None, :, :], axis=-1)
             cl_labels_te = np.argmin(D_te, axis=1)
@@ -41,9 +94,10 @@ class CentroidClusteringAnomalyDetector:
             pred_thrs = radiuses[cl_labels_te]
             predictions = np.zeros(nte)
             predictions[np.where(dists_te > pred_thrs)[0]] = 1
+            scores = (pred_thrs - dists_te) / (pred_thrs + 1e-10)
         else:
-            predictions = None
-        return predictions
+            predictions, scores = None, None
+        return predictions, scores
 
     def evaluate(self, data, alpha_range=np.arange(0, 10, 0.01), fpr_max=1.0):
 
@@ -51,7 +105,7 @@ class CentroidClusteringAnomalyDetector:
         acc_max = 0
 
         for alpha in alpha_range:
-            predictions = self.predict(data, alpha)
+            predictions = self.predict(data[0], alpha)
             if predictions is not None:
                 acc = len(np.where(predictions == data[1])[0]) / data[1].shape[0]
                 fpr = len(np.where((predictions == 1) & (data[1] == 0))[0]) / (1e-10 + len(np.where(data[1] == 0)[0]))
@@ -101,7 +155,7 @@ class CentroidClusteringAnomalyDetector:
 class ScalableKmeans(CentroidClusteringAnomalyDetector):
 
     def __init__(self):
-        super(ScalableKmeans).__init__()
+        super(ScalableKmeans, self).__init__()
 
     def fit(self, data, data_rad, n_clusters, batch_size=16, l=4, n_iters=100):
 
@@ -197,13 +251,15 @@ class ScalableKmeans(CentroidClusteringAnomalyDetector):
 
         self._calculate_distances(data_rad)
 
+        self._set_radiuses(data[0])
+
         self.trained = True
 
 
 class ClustreamKmeans(CentroidClusteringAnomalyDetector):
 
     def __init__(self):
-        super(ScalableKmeans).__init__()
+        super(ClustreamKmeans, self).__init__()
 
     def fit(self, data, data_rad, n_clusters, n_micro_clusters=16, micro_cluster_radius_alpha=3, n_iters=100, eps=1e-10):
 
@@ -336,7 +392,145 @@ class ClustreamKmeans(CentroidClusteringAnomalyDetector):
 
         self._calculate_distances(data_rad)
 
+        self._set_radiuses(data[0])
+
         self.trained = True
+
+
+class WeightedAffinityPropagation(CentroidClusteringAnomalyDetector):
+
+    def __init__(self):
+        super(WeightedAffinityPropagation, self).__init__()
+
+    def fit(self):
+
+        ntr = data[0].shape[0]
+        n_features = data[0].shape[1]
+
+        self.xmin = np.inf * np.ones(n_features)
+        self.xmax = -np.inf * np.ones(n_features)
+        C, R = [], []
+
+        # the main clustering loop
+
+        ntr = data[1].shape[0]
+        for xi in range(ntr):
+
+            # take a sample
+
+            x = data[0][xi, :].copy()
+
+            # update min and max values
+
+            self.xmin = np.min(np.vstack([self.xmin, x]), 0)
+            self.xmax = np.max(np.vstack([self.xmax, x]), 0)
+
+            # create initial micro-clsuter
+
+            if len(C) < 2:
+                C.append([1, x, x ** 2])
+                R.append(0)
+
+            # add sample to the existing framework
+
+            else:
+
+                # update the minimal distance between micro-clusters
+
+                D = np.zeros((len(C), len(C)))
+                for i in range(len(C)):
+                    for j in range(len(C)):
+                        if i < j:
+                            D[i, j] = np.sqrt(np.sum(((C[i][1] / C[i][0] - xmin) / (xmax - xmin + 1e-10) - (C[j][1] / C[j][0] - xmin) / (xmax - xmin + 1e-10)) ** 2))
+                        else:
+                            D[i, j] = np.inf
+                cl_dist_min = np.min(D)
+                i_dmin, j_dmin = np.where(D == cl_dist_min)
+                i_dmin = i_dmin[0]
+                j_dmin = j_dmin[0]
+
+                # update micro-cluster radiuses
+
+                for i in range(len(C)):
+                    if C[i][0] < 2:
+                        R[i] = cl_dist_min
+                    else:
+                        ls_ = (C[i][1] - C[i][0] * xmin) / (xmax - xmin + 1e-10)
+                        ss_ = (C[i][2] - 2 * C[i][1] * xmin + C[i][0] * xmin ** 2) / ((xmax - xmin) ** 2 + 1e-10)
+                        R[i] = micro_cluster_radius_alpha * np.mean(np.sqrt(np.clip(ss_ / C[i][0] - (ls_ / C[i][0]) ** 2, 0, np.inf)))
+                        if R[i] == 0:
+                            R[i] = cl_dist_min
+
+                # calculate distances from the sample to the micro-clusters
+
+                D = np.zeros(len(C))
+                for i in range(len(C)):
+                    D[i] = np.sqrt(np.sum(((x - xmin) / (xmax - xmin + 1e-10) - (C[i][1] / C[i][0] - xmin) / (xmax - xmin + 1e-10)) ** 2))
+                k = np.argmin(D)
+
+                if D[k] <= R[k]:
+
+                    # add sample to the existing micro-cluster
+
+                    C[k][0] += 1
+                    C[k][1] += x
+                    C[k][2] += x ** 2
+
+                else:
+
+                    # merge the closest clusters
+
+                    if len(C) == n_micro_clusters:
+                        C[i_dmin][0] += C[j_dmin][0]
+                        C[i_dmin][1] += C[j_dmin][1]
+                        C[i_dmin][2] += C[j_dmin][2]
+                        C[j_dmin][0] = 1
+                        C[j_dmin][1] = x
+                        C[j_dmin][2] = x ** 2
+                        # print(f'Micro-clusters {i_dmin} and {j_dmin} have been merged')
+
+                    # create a new cluster
+
+                    else:
+                        C.append([1, x, x ** 2])
+                        R.append(0)
+
+        W = np.hstack([c[0] for c in C])
+        C = np.vstack([c[1] / c[0] for c in C])
+
+        # weighted k-means clustering
+
+        count = np.hstack([c[0] for c in C])
+        centroids = C[np.random.choice(range(C.shape[0]), n_clusters, replace=False), :]
+
+        for i in range(n_iters):
+
+            D = np.zeros((C.shape[0], centroids.shape[0]))
+            for j in range(C.shape[0]):
+                for k in range(centroids.shape[0]):
+                    D[j, k] = np.sum(((C[j, :] - xmin) / (xmax - xmin + 1e-10) - (centroids[k, :] - xmin) / (xmax - xmin + 1e-10)) ** 2)
+            cl_labels = np.argmin(D, axis=1)
+
+            centroids_new = []
+            W_new = []
+
+            for j in range(n_clusters):
+                idx = np.where(cl_labels == j)[0]
+                if len(idx) > 0:
+                    centroids_new.append(np.sum(count[idx, None] * C[idx, :], axis=0) / (np.sum(count[idx] + 1e-10)))
+                    W_new.append(np.sum(count[idx]))
+                else:
+                    pass
+
+            if np.array_equal(centroids, centroids_new):
+                break
+
+            centroids = np.vstack(centroids_new)
+            W = np.hstack(W_new)
+
+        C = np.array(centroids)
+
+        return xmin, xmax, C, W
 
 
 if __name__ == '__main__':
@@ -344,7 +538,7 @@ if __name__ == '__main__':
     methods = [
         'ScalableKmeans',
         'ClustreamKmeans',
-        'Strap',
+        'WeightedAffinityPropagation',
         'WeightedCmeans',
         'UbiquitousSom',
         'GngOnline',
@@ -354,7 +548,7 @@ if __name__ == '__main__':
     ]
 
     parser = arp.ArgumentParser(description='Test AD methods.')
-    parser.add_argument('-d', '--dataset', help='Dataset name', default='bearing', choices=['fan', 'bearing'])
+    parser.add_argument('-d', '--dataset', help='Dataset name', default='fan', choices=['fan', 'bearing'])
     parser.add_argument('-i', '--methods', help='Method index', type=int, default=[0, 1], nargs='+', choices=[i for i in range(len(methods))])
     args = parser.parse_args()
 
@@ -365,7 +559,7 @@ if __name__ == '__main__':
         labels = {0: ['normal'], 1: ['crack', 'sand']}
 
     data_fpath = osp.join(DATA_DIR, dataset)
-    target_dataset = load_dataset(data_fpath, series_len=32, series_step=4, labels=labels, feature_extractors=['fft', 'pam'])
+    target_dataset = load_dataset(data_fpath, series_len=32, series_step=32, labels=labels, feature_extractors=['pam'])
     data = split_data(target_dataset, shuffle_features=False)
 
     cluster_range = [2, 3, 4, 5, 6, 7, 8, 9, 10]
