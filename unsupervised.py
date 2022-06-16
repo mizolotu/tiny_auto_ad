@@ -14,7 +14,7 @@ class CentroidClusteringAnomalyDetector:
     def __init__(self):
         self.trained = False
 
-    def _em(self, volume_support, s_U, s_X, n_generated, t_max=0.99, t_step=0.01):
+    def _em(self, volume_support, s_U, s_X, n_generated, t_max=0.999, t_step=0.001):
         t = np.arange(0, 1 / volume_support, t_step / volume_support)
         EM_t = np.zeros(t.shape[0])
         n_samples = s_X.shape[0]
@@ -28,7 +28,7 @@ class CentroidClusteringAnomalyDetector:
         AUC = auc(t[:amax], EM_t[:amax])
         return AUC, EM_t, amax
 
-    def _mv(self, volume_support, s_U, s_X, n_generated, alpha_step=0.001, alpha_min=0.9, alpha_max=0.999):
+    def _mv(self, volume_support, s_U, s_X, n_generated, alpha_step=0.0001, alpha_min=0.99, alpha_max=0.9999):
         axis_alpha = np.arange(alpha_min, alpha_max, alpha_step * (alpha_max - alpha_min))
         n_samples = s_X.shape[0]
         s_X_argsort = s_X.argsort()
@@ -60,7 +60,7 @@ class CentroidClusteringAnomalyDetector:
                 self.radiuses[k, 0] = 0
                 self.radiuses[k, 1] = 0
 
-    def _set_radiuses(self, data, metric='em', alpha_range=np.arange(0, 10, 0.01), n_generated=10000):
+    def _set_radiuses(self, data, metric='em', alpha_range=np.arange(0, 10, 0.01), n_generated=100000):
 
         n_features = data.shape[1]
         volume_support = (np.ones(n_features) - np.zeros(n_features)).prod()
@@ -568,15 +568,15 @@ if __name__ == '__main__':
         m = method()
         acc_method = 0
         for n_clusters in cluster_range:
-            acc_sum, fpr_sum, tpr_sum = 0, 0, 0
+            acc_sum, fpr_sum, tpr_sum, metric_sum = 0, 0, 0, 0
             for j in range(n_tries):
                 alpha, metric_val = m.fit(data['tr'], n_clusters=n_clusters, data_rad=data['val'], metric=args.metric)
                 acc, fpr, tpr = m.evaluate(data['inf'], alpha)
                 acc_sum += acc
                 fpr_sum += fpr
                 tpr_sum += tpr
-                print(f'{m.__class__.__name__} with {n_clusters} clusters and hyperparameter {alpha} (em/mv = {metric_val}): acc = {acc}, fpr = {fpr}, tpr = {tpr}')
+                metric_sum += metric_val
             #if acc_sum > acc_method:
             #    acc_method = acc_sum
             #    m.tsne_plot(data['inf'], prefix=dataset)
-            print(f'{m.__class__.__name__} with {n_clusters} clusters on average: acc = {acc_sum / n_tries}, fpr = {fpr_sum / n_tries}, tpr = {tpr_sum / n_tries}')
+            print(f'{m.__class__.__name__} with {n_clusters} clusters on average: acc = {acc_sum / n_tries}, fpr = {fpr_sum / n_tries}, tpr = {tpr_sum / n_tries}, {args.metric} = {metric_sum / n_tries}')
