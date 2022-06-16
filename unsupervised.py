@@ -545,7 +545,10 @@ if __name__ == '__main__':
     parser.add_argument('-t', '--tries', help='Number of tries', default=1, type=int)
     parser.add_argument('-c', '--clusters', help='Cluster range', default=[2, 3, 4, 5, 6, 7, 8, 9, 10], type=int, nargs='+')
     parser.add_argument('-m', '--metric', help='Metric', default='em', choices=['em', 'mv'])
+    parser.add_argument('-s', '--seed', help='Seed', default=0, type=int)
     args = parser.parse_args()
+
+    np.random.seed(args.seed)
 
     dataset = args.dataset
     if dataset == 'fan':
@@ -568,12 +571,12 @@ if __name__ == '__main__':
             acc_sum, fpr_sum, tpr_sum = 0, 0, 0
             for j in range(n_tries):
                 alpha, metric_val = m.fit(data['tr'], n_clusters=n_clusters, data_rad=data['val'], metric=args.metric)
-                print(alpha, metric_val)
                 acc, fpr, tpr = m.evaluate(data['inf'], alpha)
                 acc_sum += acc
                 fpr_sum += fpr
                 tpr_sum += tpr
+                print(f'{m.__class__.__name__} with {n_clusters} clusters and hyperparameter {alpha} (em/mv = {metric_val}): acc = {acc}, fpr = {fpr}, tpr = {tpr}')
             #if acc_sum > acc_method:
             #    acc_method = acc_sum
             #    m.tsne_plot(data['inf'], prefix=dataset)
-            print(f'{m.__class__.__name__} with {n_clusters} clusters: acc = {acc_sum / n_tries}, fpr = {fpr_sum / n_tries}, tpr = {tpr_sum / n_tries}')
+            print(f'{m.__class__.__name__} with {n_clusters} clusters on average: acc = {acc_sum / n_tries}, fpr = {fpr_sum / n_tries}, tpr = {tpr_sum / n_tries}')
