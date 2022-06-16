@@ -14,7 +14,7 @@ class CentroidClusteringAnomalyDetector:
     def __init__(self):
         self.trained = False
 
-    def _em(self, volume_support, s_U, s_X, n_generated, t_max=0.999, t_step=0.001):
+    def _em(self, volume_support, s_U, s_X, n_generated, t_max=0.99, t_step=0.01):
         t = np.arange(0, 1 / volume_support, t_step / volume_support)
         EM_t = np.zeros(t.shape[0])
         n_samples = s_X.shape[0]
@@ -28,7 +28,7 @@ class CentroidClusteringAnomalyDetector:
         AUC = auc(t[:amax], EM_t[:amax])
         return AUC, EM_t, amax
 
-    def _mv(self, volume_support, s_U, s_X, n_generated, alpha_step=0.0001, alpha_min=0.99, alpha_max=0.9999):
+    def _mv(self, volume_support, s_U, s_X, n_generated, alpha_step=0.001, alpha_min=0.9, alpha_max=0.999):
         axis_alpha = np.arange(alpha_min, alpha_max, alpha_step * (alpha_max - alpha_min))
         n_samples = s_X.shape[0]
         s_X_argsort = s_X.argsort()
@@ -62,26 +62,17 @@ class CentroidClusteringAnomalyDetector:
                 self.radiuses[k, 1] = 0
                 self.radiuses[k, 2] = 0
 
-    def _set_radiuses(self, data, metric='em', alpha_max=10, alpha_step=0.1, n_generated=100000):
+    def _set_radiuses(self, data, metric='em', alpha=7, n_generated=100000):
 
         n_features = data.shape[1]
         volume_support = (np.ones(n_features) - np.zeros(n_features)).prod()
         X_unif = np.random.uniform(np.zeros(n_features), np.ones(n_features), size=(n_generated, n_features))
         metric_fun = getattr(self, f'_{metric}')
-        alpha_min = np.max((self.radiuses[:, 2] - self.radiuses[:, 0]) / (self.radiuses[:, 1] + 1e-10))
-        alpha_range = np.arange(alpha_min, alpha_max, alpha_step)
-        metric_vals = np.zeros(len(alpha_range))
-        for i, alpha in enumerate(alpha_range):
-            _, s_X = self.predict(data, alpha)
-            if s_X is not None:
-                _, s_U = self.predict(X_unif, alpha, standardize=False)
-                metric_vals[i] = metric_fun(volume_support, s_U, s_X, n_generated)[0]
-        if metric == 'em':
-            alpha = alpha_range[np.argmax(metric_vals)]
-            metric_val = np.max(metric_vals)
-        elif metric == 'mv':
-            alpha = alpha_range[np.argmin(metric_vals)]
-            metric_val = np.min(metric_vals)
+        alpha = np.maximum(alpha, np.max((self.radiuses[:, 2] - self.radiuses[:, 0]) / (self.radiuses[:, 1] + 1e-10)))
+        _, s_X = self.predict(data, alpha)
+        if s_X is not None:
+            _, s_U = self.predict(X_unif, alpha, standardize=False)
+            metric_val = metric_fun(volume_support, s_U, s_X, n_generated)[0]
         return alpha, metric_val
 
     def predict(self, data, alpha, eps=1e-10, standardize=True):
@@ -570,6 +561,7 @@ if __name__ == '__main__':
         method = locals()[methods[i]]
         m = method()
         acc_method = 0
+        metric_vals = np.arange(len)
         for n_clusters in cluster_range:
             acc_sum, fpr_sum, tpr_sum, metric_sum = 0, 0, 0, 0
             for j in range(n_tries):
