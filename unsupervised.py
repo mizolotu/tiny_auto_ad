@@ -107,11 +107,11 @@ class CentroidClusteringAnomalyDetector:
 
         return acc, fpr, tpr
 
-    def tsne_plot(self, data, fig_dir=FIG_DIR, labels=['Normal', 'Defective'], prefix=None, eps=1e-10):
+    def tsne_plot(self, data, fig_dir=FIG_DIR, labels=['Normal', 'Defective'], prefix=None, eps=1e-10, n_samples=2000):
         if self.trained:
             nc = self.centroids.shape[0]
             X_plot = np.vstack([
-                (data[0] - self.xmin[None, :]) / (self.xmax[None, :] - self.xmin[None, :] + eps),
+                (data[0][:n_samples, :] - self.xmin[None, :]) / (self.xmax[None, :] - self.xmin[None, :] + eps),
                 (self.centroids - self.xmin[None, :]) / (self.xmax[None, :] - self.xmin[None, :] + eps),
             ])
             tsne = TSNE(n_components=2, learning_rate='auto', init='random')
@@ -119,7 +119,7 @@ class CentroidClusteringAnomalyDetector:
             pp.style.use('default')
             pp.figure(figsize=(12, 7))
             scatter_centroids = pp.scatter(X_tsne[:nc, 0], X_tsne[:nc, 1], c=np.zeros(nc), s=self.weights / np.sum(self.weights) * 2000, alpha=0.5);
-            scatter_points = pp.scatter(X_tsne[nc:, 0], X_tsne[nc:, 1], c=data[1], s=10, cmap='Accent', marker='x')
+            scatter_points = pp.scatter(X_tsne[nc:, 0], X_tsne[nc:, 1], c=data[1][:n_samples], s=10, cmap='Accent', marker='x')
             pp.xlabel('t-SNE feature 1', fontsize=10)
             pp.ylabel('t-SNE feature 2', fontsize=10)
             pp.legend(
@@ -544,6 +544,7 @@ if __name__ == '__main__':
     parser.add_argument('-f', '--feature_extractors', help='Feature extractors', nargs='+', default=['raw'])
     parser.add_argument('-n', '--n_samples', help='Number of samples', default=40000, type=int)
     parser.add_argument('-s', '--seed', help='Seed', default=0, type=int)
+    parser.add_argument('-p', '--plot', help='Plot?', type=bool)
     args = parser.parse_args()
 
     np.random.seed(args.seed)
@@ -592,7 +593,8 @@ if __name__ == '__main__':
                 fpr_best = fpr_sum / n_tries
                 method_best = m.__class__.__name__
                 n_clusters_best = n_clusters
-                #m.tsne_plot(data['inf'], prefix=dataset)
+                if args.plot:
+                    m.tsne_plot(data['inf'], prefix=dataset)
 
             print(f'{m.__class__.__name__} with {n_clusters} clusters on average: acc = {acc_sum / n_tries}, fpr = {fpr_sum / n_tries}, tpr = {tpr_sum / n_tries}, {args.metric} = {metric_sum / n_tries}')
     print(f'The best is {method_best} with {n_clusters_best} clusters: acc = {acc_best}, fpr = {fpr_best}, tpr = {tpr_best}, {args.metric} = {metric_best}')

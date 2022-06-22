@@ -9,7 +9,7 @@ from config import *
 if __name__ == '__main__':
 
     parser = arp.ArgumentParser(description='Test supervised methods.')
-    parser.add_argument('-f', '--feature_extractors', help='Feature extractors', nargs='+', default=['raw'])
+    parser.add_argument('-f', '--feature_extractors', help='Feature extractors', nargs='+', default=['fft', 'pam'])
     parser.add_argument('-d', '--dataset', help='Dataset name', default='bearing', choices=['fan', 'bearing'])
     args = parser.parse_args()
 
@@ -20,8 +20,8 @@ if __name__ == '__main__':
         labels = {0: ['normal'], 1: ['crack', 'sand']}
 
     data_fpath = osp.join(DATA_DIR, dataset)
-    target_dataset = load_dataset(data_fpath, series_len=32, series_step=4, labels=labels, feature_extractors=args.feature_extractors)
-    data = split_data(target_dataset, train_on_normal=True, shuffle_features=False)
+    target_dataset = load_dataset(data_fpath, series_len=32, series_step=1, labels=labels, feature_extractors=args.feature_extractors)
+    data = split_data(target_dataset, train_on_anomalies=True, validate_on_anomalies=True, shuffle_features=False)
 
     inp_shape = data['tr'][0].shape[1:]
 
@@ -59,7 +59,7 @@ if __name__ == '__main__':
         # outputs = tf.keras.layers.Dense(1)(hidden)
 
         model = tf.keras.models.Model(inputs, outputs)
-        model.compile(loss='binary_crossentropy', optimizer=tf.keras.optimizers.Adam(learning_rate=1e-3), metrics='binary_accuracy')
+        model.compile(loss='binary_crossentropy', optimizer=tf.keras.optimizers.Adam(learning_rate=1e-6), metrics='binary_accuracy')
 
         model.fit(
             *data['tr'],
