@@ -141,16 +141,15 @@ if __name__ == '__main__':
 
     model.summary()
 
-    p = model.predict(data['val'][0])
-    alpha = 1
-    print(np.min(p), np.max(p), np.mean(p), np.std(p))
+    p = np.clip(model.predict(data['val'][0]), 0, np.inf)
+    alpha = 3
     thr = np.mean(p) + alpha * np.std(p)
     predictions = np.zeros(len(data['inf'][1]))
-    predictions[np.where(predictions > thr)[0]] = 1
+    y_pred = np.clip(model.predict(data['inf'][0]), 0, 1)
+    predictions[np.where(y_pred > thr)[0]] = 1
     acc = len(np.where(predictions == data['inf'][1])[0]) / data['inf'][1].shape[0]
     fpr = len(np.where((predictions == 1) & (data['inf'][1] == 0))[0]) / (1e-10 + len(np.where(data['inf'][1] == 0)[0]))
     tpr = len(np.where((predictions == 1) & (data['inf'][1] == 1))[0]) / (1e-10 + len(np.where(data['inf'][1] == 1)[0]))
-    y_pred = np.clip(model.predict(data['inf'][0]), 0, 1)
     auc = roc_auc_score(data['inf'][1], y_pred)
     print(f'Accuracy = {acc}, TPR = {tpr}, FPR = {fpr}, AUC = {auc}')
     fpr, tpr, thresholds = roc_curve(data['inf'][1], y_pred)
