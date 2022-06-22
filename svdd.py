@@ -106,6 +106,7 @@ if __name__ == '__main__':
     thr = np.mean(p) + alpha * np.std(p)
     predictions = np.zeros(len(p))
     predictions[np.where(predictions > thr)[0]] = 1
+    print(thr)
     acc = len(np.where(predictions == data['inf'][1])[0]) / data['inf'][1].shape[0]
     fpr = len(np.where((predictions == 1) & (data['inf'][1] == 0))[0]) / (1e-10 + len(np.where(data['inf'][1] == 0)[0]))
     tpr = len(np.where((predictions == 1) & (data['inf'][1] == 1))[0]) / (1e-10 + len(np.where(data['inf'][1] == 1)[0]))
