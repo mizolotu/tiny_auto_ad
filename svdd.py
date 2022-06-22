@@ -42,6 +42,7 @@ class Svdd(tf.keras.models.Model):
         }
 
     def test_step(self, data):
+        print(data)
         inputs, outputs = data
         x = self.preprocessor(inputs)
         y_pred = tf.reduce_sum(tf.square(x - self.c), axis=-1)
@@ -67,7 +68,7 @@ if __name__ == '__main__':
     data_fpath = osp.join(DATA_DIR, dataset)
     target_dataset = load_dataset(data_fpath, series_len=32, series_step=8, labels=labels, feature_extractors=args.feature_extractors)
     data = split_data(target_dataset, train_on_anomalies=False, validate_on_anomalies=False, shuffle_features=False)
-    
+
     inp_shape = data['tr'][0].shape[1:]
 
     model_fpath = osp.join('model_autokeras', args.dataset, *[str(fe) for fe in args.feature_extractors])
