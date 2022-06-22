@@ -2,11 +2,11 @@ import numpy as np
 import argparse as arp
 import os.path as osp
 import tensorflow as tf
-import tqdm
 
 from preprocess_data import load_dataset, split_data
 from config import *
 from sklearn.metrics import auc, roc_auc_score, roc_curve
+from matplotlib import pyplot as pp
 
 class Svdd(tf.keras.models.Model):
 
@@ -96,15 +96,15 @@ if __name__ == '__main__':
     hidden = tf.keras.layers.Dense(units=512)(hidden)
     hidden = tf.keras.layers.BatchNormalization()(hidden)
     hidden = tf.keras.layers.ReLU()(hidden)
+    #hidden = tf.keras.layers.Dropout()(hidden)
     hidden = tf.keras.layers.Dense(units=512)(hidden)
     hidden = tf.keras.layers.BatchNormalization()(hidden)
     outputs = tf.keras.layers.ReLU()(hidden)
     preprocessor = tf.keras.models.Model(inputs, outputs)
 
-    model = Svdd(preprocessor=preprocessor, nu=0.1)
-    print(dir(model))
+    model = Svdd(preprocessor=preprocessor, nu=0.01)
     model.build(input_shape=(None, *inp_shape), X=data['tr'][0])
-    model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=1e-4))
+    model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=2.5e-4))
 
     model.fit(
         *data['tr'],
@@ -126,7 +126,12 @@ if __name__ == '__main__':
     acc = len(np.where(predictions == data['inf'][1])[0]) / data['inf'][1].shape[0]
     fpr = len(np.where((predictions == 1) & (data['inf'][1] == 0))[0]) / (1e-10 + len(np.where(data['inf'][1] == 0)[0]))
     tpr = len(np.where((predictions == 1) & (data['inf'][1] == 1))[0]) / (1e-10 + len(np.where(data['inf'][1] == 1)[0]))
-    auc = roc_auc_score(data['inf'][1], np.clip(model.predict(data['inf'][0]), 0, 1))
+    y_pred = np.clip(model.predict(data['inf'][0]), 0, 1)
+    auc = roc_auc_score(data['inf'][1], y_pred)
     print(f'Accuracy = {acc}, TPR = {tpr}, FPR = {fpr}, AUC = {auc}')
+    fpr, tpr, thresholds = roc_curve(data['inf'][1], y_pred)
+    pp.plot(fpr, tpr, '.')
+    pp.savefig('tmp.png')
+    pp.close()
 
 
