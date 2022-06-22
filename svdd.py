@@ -42,8 +42,8 @@ class Svdd(tf.keras.models.Model):
         }
 
     def test_step(self, data):
-        print(data)
-        inputs, outputs = data
+        inputs = data[0]
+        outputs = data[1]
         x = self.preprocessor(inputs)
         y_pred = tf.reduce_sum(tf.square(x - self.c), axis=-1)
         loss = tf.reduce_mean(y_pred)
