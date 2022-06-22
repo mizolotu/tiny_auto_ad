@@ -43,7 +43,8 @@ class Svdd(tf.keras.models.Model):
 
     def test_step(self, data):
         inputs = data[0]
-        outputs = data[1]
+        print(data)
+        print(inputs)
         x = self.preprocessor(inputs)
         y_pred = tf.reduce_sum(tf.square(x - self.c), axis=-1)
         loss = tf.reduce_mean(y_pred)
@@ -56,7 +57,7 @@ if __name__ == '__main__':
 
     parser = arp.ArgumentParser(description='Test supervised methods.')
     parser.add_argument('-f', '--feature_extractors', help='Feature extractors', nargs='+', default=['pam'])
-    parser.add_argument('-d', '--dataset', help='Dataset name', default='fan', choices=['fan', 'bearing'])
+    parser.add_argument('-d', '--dataset', help='Dataset name', default='bearing', choices=['fan', 'bearing'])
     args = parser.parse_args()
 
     dataset = args.dataset
@@ -101,7 +102,5 @@ if __name__ == '__main__':
 
     p = np.clip(model.predict(data['inf'][0]), 0, 1)
     print(roc_auc_score(data['inf'][1], p))
-    for pi, yi in zip(p, data['inf'][1]):
-        print(pi, yi)
 
 
