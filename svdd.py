@@ -101,7 +101,7 @@ if __name__ == '__main__':
 
     model.summary()
 
-    p = np.clip(model.predict(data['inf'][0]), 0, 1)
+    p = np.clip(model.predict(data['val'][0]), 0, 1)
     alpha = 1
     thr = np.mean(p) + alpha * np.std(p)
     predictions = np.zeros(len(p))
