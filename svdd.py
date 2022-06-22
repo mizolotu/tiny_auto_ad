@@ -93,16 +93,39 @@ if __name__ == '__main__':
 
     inputs = tf.keras.layers.Input(shape=inp_shape)
     hidden = (inputs - np.mean(data['tr'][0], 0)[None, :]) / (np.std(data['tr'][0], 0)[None, :] + 1e-10)
-    hidden = tf.keras.layers.Dense(units=1024)(hidden)
+    hidden = tf.keras.layers.Dense(units=64)(hidden)
     hidden = tf.keras.layers.BatchNormalization()(hidden)
     hidden = tf.keras.layers.ReLU()(hidden)
-    #hidden = tf.keras.layers.Dropout()(hidden)
-    hidden = tf.keras.layers.Dense(units=1024)(hidden)
+    hidden = tf.keras.layers.Dense(units=32)(hidden)
     hidden = tf.keras.layers.BatchNormalization()(hidden)
-    outputs = tf.keras.layers.ReLU()(hidden)
-    preprocessor = tf.keras.models.Model(inputs, outputs)
+    hidden = tf.keras.layers.ReLU()(hidden)
+    encoded = tf.keras.layers.Dense(units=16)(hidden)
+    encoder = tf.keras.models.Model(inputs, encoded)
 
-    model = Svdd(preprocessor=preprocessor, nu=0.01)
+    hidden = tf.keras.layers.Dense(units=32)(encoded)
+    hidden = tf.keras.layers.BatchNormalization()(hidden)
+    hidden = tf.keras.layers.ReLU()(hidden)
+    hidden = tf.keras.layers.Dense(units=64)(hidden)
+    hidden = tf.keras.layers.BatchNormalization()(hidden)
+    hidden = tf.keras.layers.ReLU()(hidden)
+    outputs = tf.keras.layers.Dense(units=inp_shape[0])(hidden)
+
+    autoencoder = tf.keras.models.Model(inputs, outputs)
+    autoencoder.compile(loss='mean_squared_error', optimizer=tf.keras.optimizers.Adam(learning_rate=1e-4))
+    autoencoder.fit(
+        *data['tr'],
+        validation_data=data['val'],
+        epochs=10000,
+        batch_size=512,
+        callbacks=[
+            tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=100, mode='min', restore_best_weights=True)
+        ]
+    )
+
+    for e_layer, a_layer in zip(encoder.weights, autoencoder.weights):
+        e_layer.assign(a_layer)
+
+    model = Svdd(preprocessor=encoder, nu=0.01)
     model.build(input_shape=(None, *inp_shape), X=data['tr'][0])
     model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=1e-4))
 
