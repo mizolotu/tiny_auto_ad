@@ -59,7 +59,11 @@ if __name__ == '__main__':
     parser = arp.ArgumentParser(description='Test supervised methods.')
     parser.add_argument('-f', '--feature_extractors', help='Feature extractors', nargs='+', default=['fft', 'pam'])
     parser.add_argument('-d', '--dataset', help='Dataset name', default='bearing', choices=['fan', 'bearing'])
+    parser.add_argument('-s', '--seed', help='Seed', default=0, type=int)
     args = parser.parse_args()
+
+    np.random.seed(args.seed)
+    tf.random.set_seed(args.seed)
 
     dataset = args.dataset
     if dataset == 'fan':
@@ -104,7 +108,7 @@ if __name__ == '__main__':
     p = np.clip(model.predict(data['val'][0]), 0, 1)
     alpha = 1
     thr = np.mean(p) + alpha * np.std(p)
-    predictions = np.zeros(len(p))
+    predictions = np.zeros(len(data['inf'][1]))
     predictions[np.where(predictions > thr)[0]] = 1
     acc = len(np.where(predictions == data['inf'][1])[0]) / data['inf'][1].shape[0]
     fpr = len(np.where((predictions == 1) & (data['inf'][1] == 0))[0]) / (1e-10 + len(np.where(data['inf'][1] == 0)[0]))
