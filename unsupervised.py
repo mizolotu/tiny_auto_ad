@@ -539,8 +539,10 @@ if __name__ == '__main__':
     parser.add_argument('-d', '--dataset', help='Dataset name', default='fan', choices=['fan', 'bearing'])
     parser.add_argument('-i', '--methods', help='Method index', type=int, default=[0, 1], nargs='+', choices=[i for i in range(len(methods))])
     parser.add_argument('-t', '--tries', help='Number of tries', default=1, type=int)
-    parser.add_argument('-c', '--clusters', help='Cluster range', default=[2, 3, 4, 5, 6, 7, 8, 9, 10], type=int, nargs='+')
+    parser.add_argument('-c', '--clusters', help='Cluster range', default=[2, 3, 4, 5], type=int, nargs='+')
     parser.add_argument('-m', '--metric', help='Metric', default='em', choices=['em', 'mv'])
+    parser.add_argument('-f', '--feature_extractors', help='Feature extractors', nargs='+', default=['raw'])
+    parser.add_argument('-n', '--n_samples', help='Number of samples', default=2000, type=int)
     parser.add_argument('-s', '--seed', help='Seed', default=0, type=int)
     args = parser.parse_args()
 
@@ -553,7 +555,7 @@ if __name__ == '__main__':
         labels = {0: ['normal'], 1: ['crack', 'sand']}
 
     data_fpath = osp.join(DATA_DIR, dataset)
-    target_dataset = load_dataset(data_fpath, series_len=32, series_step=1, labels=labels, feature_extractors=['pam'])
+    target_dataset = load_dataset(data_fpath, series_len=32, series_step=1, labels=labels, feature_extractors=args.feature_extractors, n_samples=args.n_samples)
     data = split_data(target_dataset, shuffle_features=False)
 
     cluster_range = args.clusters

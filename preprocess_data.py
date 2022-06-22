@@ -114,7 +114,7 @@ def fft(X, xmin=-32768, xmax=32767):
     return np.stack(E)
 
 
-def load_dataset(data_dir, series_len, series_step, labels, feature_extractors=[], seed=0, check_baseline=False):
+def load_dataset(data_dir, series_len, series_step, labels, feature_extractors=[], seed=0, check_baseline=False, n_samples=None):
     np.random.seed(seed)
     sample_subdirs = [subdir for subdir in os.listdir(data_dir) if osp.isdir(osp.join(data_dir, subdir))]
     X, Y = [], []
@@ -139,9 +139,7 @@ def load_dataset(data_dir, series_len, series_step, labels, feature_extractors=[
                             x -= b_mean[None, :]
                         n = x.shape[0]
                         y = np.ones((n, 1)) * label_key
-                        n_series = n // series_len
                         for j in range(0, n - series_len, series_step):
-                            #j = np.random.randint(0, n - series_len)
                             s_x = x[j : j + series_len, :]
                             s_y = y[j + series_len, 0]
                             X.append(s_x)
@@ -153,6 +151,12 @@ def load_dataset(data_dir, series_len, series_step, labels, feature_extractors=[
     np.random.shuffle(idx)
     X = X[idx, :]
     Y = Y[idx, :]
+
+    if n_samples is not None:
+        print(f'{n_samples} out of {X.shape[0]} samples will be used')
+        X = X[:n_samples, :]
+        Y = Y[:n_samples, :]
+
 
     for feature_extractor in feature_extractors:
         extract_features = globals()[feature_extractor]
