@@ -114,7 +114,7 @@ if __name__ == '__main__':
     autoencoder.compile(loss='mean_squared_error', optimizer=tf.keras.optimizers.Adam(learning_rate=1e-4))
     autoencoder.fit(
         *data['tr'],
-        validation_data=data['val'],
+        validation_data=(data['val'][0], data['val'][1]),
         epochs=10000,
         batch_size=512,
         callbacks=[
@@ -131,7 +131,7 @@ if __name__ == '__main__':
 
     model.fit(
         *data['tr'],
-        validation_data=data['val'],
+        validation_data=(data['val'][0], data['val'][1]),
         epochs=10000,
         batch_size=512,
         callbacks=[
