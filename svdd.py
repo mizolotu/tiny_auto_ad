@@ -42,9 +42,10 @@ class Svdd(tf.keras.models.Model):
         }
 
     def test_step(self, data):
-        inputs = data[0]
-        print(data)
-        print(inputs)
+        if len(data) == 2:
+            inputs, outputs = data
+        else:
+            inputs, outputs = data[0]
         x = self.preprocessor(inputs)
         y_pred = tf.reduce_sum(tf.square(x - self.c), axis=-1)
         loss = tf.reduce_mean(y_pred)
@@ -56,7 +57,7 @@ class Svdd(tf.keras.models.Model):
 if __name__ == '__main__':
 
     parser = arp.ArgumentParser(description='Test supervised methods.')
-    parser.add_argument('-f', '--feature_extractors', help='Feature extractors', nargs='+', default=['pam'])
+    parser.add_argument('-f', '--feature_extractors', help='Feature extractors', nargs='+', default=['fft', 'pam'])
     parser.add_argument('-d', '--dataset', help='Dataset name', default='bearing', choices=['fan', 'bearing'])
     args = parser.parse_args()
 
