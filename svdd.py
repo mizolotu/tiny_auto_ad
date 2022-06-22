@@ -93,18 +93,18 @@ if __name__ == '__main__':
 
     inputs = tf.keras.layers.Input(shape=inp_shape)
     hidden = (inputs - np.mean(data['tr'][0], 0)[None, :]) / (np.std(data['tr'][0], 0)[None, :] + 1e-10)
-    hidden = tf.keras.layers.Dense(units=512)(hidden)
+    hidden = tf.keras.layers.Dense(units=1024)(hidden)
     hidden = tf.keras.layers.BatchNormalization()(hidden)
     hidden = tf.keras.layers.ReLU()(hidden)
     #hidden = tf.keras.layers.Dropout()(hidden)
-    hidden = tf.keras.layers.Dense(units=512)(hidden)
+    hidden = tf.keras.layers.Dense(units=1024)(hidden)
     hidden = tf.keras.layers.BatchNormalization()(hidden)
     outputs = tf.keras.layers.ReLU()(hidden)
     preprocessor = tf.keras.models.Model(inputs, outputs)
 
     model = Svdd(preprocessor=preprocessor, nu=0.01)
     model.build(input_shape=(None, *inp_shape), X=data['tr'][0])
-    model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=2.5e-4))
+    model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=1e-4))
 
     model.fit(
         *data['tr'],
