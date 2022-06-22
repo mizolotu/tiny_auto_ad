@@ -2,6 +2,7 @@ import numpy as np
 import argparse as arp
 import os.path as osp
 import tensorflow as tf
+import tqdm
 
 from preprocess_data import load_dataset, split_data
 from config import *
@@ -9,7 +10,7 @@ from sklearn.metrics import auc, roc_auc_score, roc_curve
 
 class Svdd(tf.keras.models.Model):
 
-    def __init__(self, preprocessor, nu):
+    def __init__(self, preprocessor, nu=0.05):
         super(Svdd, self).__init__()
         self.nu = nu
         self.preprocessor = preprocessor
@@ -20,7 +21,7 @@ class Svdd(tf.keras.models.Model):
         input_dims = input_shape[1:]
         self.input_spec = tf.keras.layers.InputSpec(dtype=tf.float32, shape=(None, *input_dims))
         self.c = tf.reduce_mean(self.preprocessor(X), 0)
-        self.R = self.add_weight(shape=[], initializer='glorot_uniform', name='R')
+        self.R = self.add_weight(shape=[], initializer='glorot_uniform', name='R', trainable=False)
         self.built = True
 
     def call(self, x):
@@ -42,6 +43,10 @@ class Svdd(tf.keras.models.Model):
         grads = tape.gradient(loss, self.trainable_weights)
         self.optimizer.apply_gradients(zip(grads, self.trainable_weights))
         self.loss_tracker.update_state(loss)
+
+        test = tf.sort(tf.math.sqrt(dists))[tf.cast((1 - self.nu) * tf.math.reduce_sum(tf.ones_like(dists)), tf.int32)]
+        self.R.assign(test)
+
         return {
             "loss": self.loss_tracker.result()
         }
@@ -88,15 +93,16 @@ if __name__ == '__main__':
 
     inputs = tf.keras.layers.Input(shape=inp_shape)
     hidden = (inputs - np.mean(data['tr'][0], 0)[None, :]) / (np.std(data['tr'][0], 0)[None, :] + 1e-10)
-    hidden = tf.keras.layers.Dense(units=64)(hidden)
+    hidden = tf.keras.layers.Dense(units=512)(hidden)
     hidden = tf.keras.layers.BatchNormalization()(hidden)
     hidden = tf.keras.layers.ReLU()(hidden)
-    hidden = tf.keras.layers.Dense(units=32)(hidden)
+    hidden = tf.keras.layers.Dense(units=512)(hidden)
     hidden = tf.keras.layers.BatchNormalization()(hidden)
     outputs = tf.keras.layers.ReLU()(hidden)
     preprocessor = tf.keras.models.Model(inputs, outputs)
 
     model = Svdd(preprocessor=preprocessor, nu=0.1)
+    print(dir(model))
     model.build(input_shape=(None, *inp_shape), X=data['tr'][0])
     model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=1e-4))
 
