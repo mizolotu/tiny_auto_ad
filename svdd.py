@@ -143,6 +143,7 @@ if __name__ == '__main__':
 
     p = model.predict(data['val'][0])
     alpha = 1
+    print(np.min(p), np.max(p), np.mean(p), np.std(p))
     thr = np.mean(p) + alpha * np.std(p)
     predictions = np.zeros(len(data['inf'][1]))
     predictions[np.where(predictions > thr)[0]] = 1
