@@ -81,10 +81,10 @@ if __name__ == '__main__':
 
     inputs = tf.keras.layers.Input(shape=inp_shape)
     hidden = (inputs - np.mean(data['tr'][0], 0)[None, :]) / (np.std(data['tr'][0], 0)[None, :] + 1e-10)
-    hidden = tf.keras.layers.Dense(units=512)(hidden)
+    hidden = tf.keras.layers.Dense(units=64)(hidden)
     hidden = tf.keras.layers.BatchNormalization()(hidden)
     hidden = tf.keras.layers.ReLU()(hidden)
-    hidden = tf.keras.layers.Dense(units=512)(hidden)
+    hidden = tf.keras.layers.Dense(units=32)(hidden)
     hidden = tf.keras.layers.BatchNormalization()(hidden)
     outputs = tf.keras.layers.ReLU()(hidden)
     preprocessor = tf.keras.models.Model(inputs, outputs)
@@ -105,7 +105,7 @@ if __name__ == '__main__':
 
     model.summary()
 
-    p = np.clip(model.predict(data['val'][0]), 0, 1)
+    p = model.predict(data['val'][0])
     alpha = 1
     thr = np.mean(p) + alpha * np.std(p)
     predictions = np.zeros(len(data['inf'][1]))
@@ -113,7 +113,7 @@ if __name__ == '__main__':
     acc = len(np.where(predictions == data['inf'][1])[0]) / data['inf'][1].shape[0]
     fpr = len(np.where((predictions == 1) & (data['inf'][1] == 0))[0]) / (1e-10 + len(np.where(data['inf'][1] == 0)[0]))
     tpr = len(np.where((predictions == 1) & (data['inf'][1] == 1))[0]) / (1e-10 + len(np.where(data['inf'][1] == 1)[0]))
-    auc = roc_auc_score(data['inf'][1], p)
+    auc = roc_auc_score(data['inf'][1], np.clip(model.predict(data['val'][0]), 0, 1))
     print(f'Accuracy = {acc}, TPR = {tpr}, FPR = {fpr}, AUC = {auc}')
 
 
