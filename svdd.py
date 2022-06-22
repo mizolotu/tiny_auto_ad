@@ -25,14 +25,19 @@ class Svdd(tf.keras.models.Model):
 
     def call(self, x):
         x = self.preprocessor(x)
-        return tf.reduce_sum(tf.square(x - self.c), axis=-1)
+        dists = tf.reduce_sum(tf.square(x - self.c), axis=-1)
+        scores = dists - self.R ** 2
+        return scores
 
     def train_step(self, data):
         inputs, outputs = data
         with tf.GradientTape() as tape:
             x = self.preprocessor(inputs)
-            y_pred = tf.reduce_sum(tf.square(x - self.c), axis=-1)
-            loss = tf.reduce_mean(y_pred)
+            dists = tf.reduce_sum(tf.square(x - self.c), axis=-1)
+            scores = dists - self.R ** 2
+            penalty = tf.maximum(scores, tf.zeros_like(scores))
+            loss = self.R ** 2 + (1 / self.nu) * penalty
+            #loss = tf.reduce_mean(dists)
 
         grads = tape.gradient(loss, self.trainable_weights)
         self.optimizer.apply_gradients(zip(grads, self.trainable_weights))
@@ -47,8 +52,10 @@ class Svdd(tf.keras.models.Model):
         else:
             inputs, outputs = data[0]
         x = self.preprocessor(inputs)
-        y_pred = tf.reduce_sum(tf.square(x - self.c), axis=-1)
-        loss = tf.reduce_mean(y_pred)
+        dists = tf.reduce_sum(tf.square(x - self.c), axis=-1)
+        scores = dists - self.R ** 2
+        penalty = tf.maximum(scores, tf.zeros_like(scores))
+        loss = self.R ** 2 + (1 / self.nu) * penalty
         self.loss_tracker.update_state(loss)
         return {
             "loss": self.loss_tracker.result()
@@ -57,7 +64,7 @@ class Svdd(tf.keras.models.Model):
 if __name__ == '__main__':
 
     parser = arp.ArgumentParser(description='Test supervised methods.')
-    parser.add_argument('-f', '--feature_extractors', help='Feature extractors', nargs='+', default=['fft', 'pam'])
+    parser.add_argument('-f', '--feature_extractors', help='Feature extractors', nargs='+', default=['pam'])
     parser.add_argument('-d', '--dataset', help='Dataset name', default='bearing', choices=['fan', 'bearing'])
     parser.add_argument('-s', '--seed', help='Seed', default=0, type=int)
     args = parser.parse_args()
@@ -113,7 +120,7 @@ if __name__ == '__main__':
     acc = len(np.where(predictions == data['inf'][1])[0]) / data['inf'][1].shape[0]
     fpr = len(np.where((predictions == 1) & (data['inf'][1] == 0))[0]) / (1e-10 + len(np.where(data['inf'][1] == 0)[0]))
     tpr = len(np.where((predictions == 1) & (data['inf'][1] == 1))[0]) / (1e-10 + len(np.where(data['inf'][1] == 1)[0]))
-    auc = roc_auc_score(data['inf'][1], np.clip(model.predict(data['val'][0]), 0, 1))
+    auc = roc_auc_score(data['inf'][1], np.clip(model.predict(data['inf'][0]), 0, 1))
     print(f'Accuracy = {acc}, TPR = {tpr}, FPR = {fpr}, AUC = {auc}')
 
 
