@@ -258,7 +258,7 @@ class ClustreamKmeans(CentroidClusteringAnomalyDetector):
     def __init__(self):
         super(ClustreamKmeans, self).__init__()
 
-    def fit(self, data, validation_data, n_clusters=2, n_micro_clusters=16, micro_cluster_radius_alpha=3, n_iters=40, eps=1e-10, metric='em'):
+    def fit(self, data, validation_data, hp=2, n_micro_clusters=16, micro_cluster_radius_alpha=3, n_iters=40, eps=1e-10, metric='em'):
 
         ntr = data[0].shape[0]
         n_features = data[0].shape[1]
@@ -269,6 +269,7 @@ class ClustreamKmeans(CentroidClusteringAnomalyDetector):
         self.xmax = -np.inf * np.ones(n_features)
 
         C, R = [], []
+        n_clusters = hp
 
         # the main clustering loop
 
