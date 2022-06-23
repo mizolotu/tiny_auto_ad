@@ -89,8 +89,6 @@ if __name__ == '__main__':
 
     inp_shape = data['tr'][0].shape[1:]
 
-    model_fpath = osp.join('model_autokeras', args.dataset, *[str(fe) for fe in args.feature_extractors])
-
     inputs = tf.keras.layers.Input(shape=inp_shape)
     hidden = (inputs - np.mean(data['tr'][0], 0)[None, :]) / (np.std(data['tr'][0], 0)[None, :] + 1e-10)
     hidden = tf.keras.layers.Dense(units=64)(hidden)

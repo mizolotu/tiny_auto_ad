@@ -1,6 +1,7 @@
 import numpy as np
 import argparse as arp
 import os.path as osp
+import tensorflow as tf
 
 from matplotlib import pyplot as pp
 from sklearn.manifold import TSNE
@@ -9,10 +10,10 @@ from preprocess_data import load_dataset, split_data
 from config import *
 
 
-class CentroidClusteringAnomalyDetector:
+class AnomalyDetector:
 
     def __init__(self):
-        self.trained = False
+        pass
 
     def _em(self, volume_support, s_U, s_X, n_generated, t_max=0.99, t_step=0.01):
         t = np.arange(0, 1 / volume_support, t_step / volume_support)
@@ -44,6 +45,23 @@ class CentroidClusteringAnomalyDetector:
             mv[i] = float((s_U >= u).sum()) / n_generated * volume_support
         return auc(axis_alpha, mv), mv
 
+    def evaluate(self, data, alpha):
+        predictions, _ = self.predict(data[0], alpha)
+        if predictions is not None:
+            acc = len(np.where(predictions == data[1])[0]) / data[1].shape[0]
+            fpr = len(np.where((predictions == 1) & (data[1] == 0))[0]) / (1e-10 + len(np.where(data[1] == 0)[0]))
+            tpr = len(np.where((predictions == 1) & (data[1] == 1))[0]) / (1e-10 + len(np.where(data[1] == 1)[0]))
+        else:
+            acc, fpr, tpr = 0, 0, 0
+
+        return acc, fpr, tpr
+
+
+class CentroidClusteringAnomalyDetector(AnomalyDetector):
+
+    def __init__(self):
+        super(CentroidClusteringAnomalyDetector, self).__init__()
+
     def _calculate_distances(self, data, eps=1e-10):
         E_va_ = (data[0] - self.xmin[None, :]) / (self.xmax[None, :] - self.xmin[None, :] + eps)
         C_ = (self.centroids - self.xmin[None, :]) / (self.xmax[None, :] - self.xmin[None, :] + eps)
@@ -63,7 +81,6 @@ class CentroidClusteringAnomalyDetector:
                 self.radiuses[k, 2] = 0
 
     def _set_radiuses(self, data, metric='em', alpha=3, n_generated=100000):
-
         n_features = data.shape[1]
         volume_support = (np.ones(n_features) - np.zeros(n_features)).prod()
         X_unif = np.random.uniform(np.zeros(n_features), np.ones(n_features), size=(n_generated, n_features))
@@ -77,23 +94,20 @@ class CentroidClusteringAnomalyDetector:
         return alpha, metric_val
 
     def predict(self, data, alpha, eps=1e-10, standardize=True):
-        if self.trained:
-            radiuses = self.radiuses[:, 0] + alpha * self.radiuses[:, 1]
-            if standardize:
-                E_te_ = (data - self.xmin[None, :]) / (self.xmax[None, :] - self.xmin[None, :] + eps)
-            else:
-                E_te_ = data
-            C_ = (self.centroids - self.xmin[None, :]) / (self.xmax[None, :] - self.xmin[None, :] + eps)
-            D_te = np.linalg.norm(E_te_[:, None, :] - C_[None, :, :], axis=-1)
-            cl_labels_te = np.argmin(D_te, axis=1)
-            dists_te = np.min(D_te, axis=1)
-            nte = E_te_.shape[0]
-            pred_thrs = radiuses[cl_labels_te]
-            predictions = np.zeros(nte)
-            predictions[np.where(dists_te > pred_thrs)[0]] = 1
-            scores = (pred_thrs - dists_te) / (pred_thrs + 1e-10)
+        radiuses = self.radiuses[:, 0] + alpha * self.radiuses[:, 1]
+        if standardize:
+            E_te_ = (data - self.xmin[None, :]) / (self.xmax[None, :] - self.xmin[None, :] + eps)
         else:
-            predictions, scores = None, None
+            E_te_ = data
+        C_ = (self.centroids - self.xmin[None, :]) / (self.xmax[None, :] - self.xmin[None, :] + eps)
+        D_te = np.linalg.norm(E_te_[:, None, :] - C_[None, :, :], axis=-1)
+        cl_labels_te = np.argmin(D_te, axis=1)
+        dists_te = np.min(D_te, axis=1)
+        nte = E_te_.shape[0]
+        pred_thrs = radiuses[cl_labels_te]
+        predictions = np.zeros(nte)
+        predictions[np.where(dists_te > pred_thrs)[0]] = 1
+        scores = (pred_thrs - dists_te) / (pred_thrs + 1e-10)
         return predictions, scores
 
     def evaluate(self, data, alpha):
@@ -108,32 +122,28 @@ class CentroidClusteringAnomalyDetector:
         return acc, fpr, tpr
 
     def tsne_plot(self, data, fig_dir=FIG_DIR, labels=['Normal', 'Defective'], prefix=None, eps=1e-10, n_samples=2000):
-        if self.trained:
-            nc = self.centroids.shape[0]
-            X_plot = np.vstack([
-                (data[0][:n_samples, :] - self.xmin[None, :]) / (self.xmax[None, :] - self.xmin[None, :] + eps),
-                (self.centroids - self.xmin[None, :]) / (self.xmax[None, :] - self.xmin[None, :] + eps),
-            ])
-            tsne = TSNE(n_components=2, learning_rate='auto', init='random')
-            X_tsne = tsne.fit_transform(X_plot)
-            pp.style.use('default')
-            pp.figure(figsize=(12, 7))
-            scatter_centroids = pp.scatter(X_tsne[:nc, 0], X_tsne[:nc, 1], c=np.zeros(nc), s=self.weights / np.sum(self.weights) * 2000, alpha=0.5);
-            scatter_points = pp.scatter(X_tsne[nc:, 0], X_tsne[nc:, 1], c=data[1][:n_samples], s=10, cmap='Accent', marker='x')
-            pp.xlabel('t-SNE feature 1', fontsize=10)
-            pp.ylabel('t-SNE feature 2', fontsize=10)
-            pp.legend(
-                scatter_points.legend_elements()[0] + scatter_centroids.legend_elements()[0],
-                labels + ['cluster centroids'],
-                loc=0
-            )
-            fname = f'{prefix}_' if prefix is not None else ''
-            #fname += f'tsne_{self.__class__.__name__}_{nc}.pdf'
-            fname += 'tsne.pdf'
-            pp.savefig(osp.join(fig_dir, fname))
-            pp.close()
-        else:
-            print('You are trying to plot untrained classifier!')
+        nc = self.centroids.shape[0]
+        X_plot = np.vstack([
+            (data[0][:n_samples, :] - self.xmin[None, :]) / (self.xmax[None, :] - self.xmin[None, :] + eps),
+            (self.centroids - self.xmin[None, :]) / (self.xmax[None, :] - self.xmin[None, :] + eps),
+        ])
+        tsne = TSNE(n_components=2, learning_rate='auto', init='random')
+        X_tsne = tsne.fit_transform(X_plot)
+        pp.style.use('default')
+        pp.figure(figsize=(12, 7))
+        scatter_centroids = pp.scatter(X_tsne[:nc, 0], X_tsne[:nc, 1], c=np.zeros(nc), s=self.weights / np.sum(self.weights) * 2000, alpha=0.5);
+        scatter_points = pp.scatter(X_tsne[nc:, 0], X_tsne[nc:, 1], c=data[1][:n_samples], s=10, cmap='Accent', marker='x')
+        pp.xlabel('t-SNE feature 1', fontsize=10)
+        pp.ylabel('t-SNE feature 2', fontsize=10)
+        pp.legend(
+            scatter_points.legend_elements()[0] + scatter_centroids.legend_elements()[0],
+            labels + ['cluster centroids'],
+            loc=0
+        )
+        fname = f'{prefix}_' if prefix is not None else ''
+        fname += 'tsne.pdf'
+        pp.savefig(osp.join(fig_dir, fname))
+        pp.close()
 
 
 class ScalableKmeans(CentroidClusteringAnomalyDetector):
@@ -141,7 +151,7 @@ class ScalableKmeans(CentroidClusteringAnomalyDetector):
     def __init__(self):
         super(ScalableKmeans, self).__init__()
 
-    def fit(self, data, data_rad, n_clusters, batch_size=16, l=4, n_iters=100, metric='em'):
+    def fit(self, data, validation_data, n_clusters=2, batch_size=16, l=4, n_iters=100, metric='em'):
 
         n_features = data[0].shape[1]
 
@@ -233,11 +243,9 @@ class ScalableKmeans(CentroidClusteringAnomalyDetector):
 
             self.centroids = np.array(centroids)
 
-        self._calculate_distances(data_rad)
+        self._calculate_distances(validation_data)
 
-        self.trained = True
-
-        alpha, metric_val = self._set_radiuses(data[0], metric=metric)
+        alpha, metric_val = self._set_radiuses(validation_data[0], metric=metric)
 
         return alpha, metric_val
 
@@ -247,7 +255,7 @@ class ClustreamKmeans(CentroidClusteringAnomalyDetector):
     def __init__(self):
         super(ClustreamKmeans, self).__init__()
 
-    def fit(self, data, data_rad, n_clusters, n_micro_clusters=16, micro_cluster_radius_alpha=3, n_iters=40, eps=1e-10, metric='em'):
+    def fit(self, data, validation_data, n_clusters=2, n_micro_clusters=16, micro_cluster_radius_alpha=3, n_iters=40, eps=1e-10, metric='em'):
 
         ntr = data[0].shape[0]
         n_features = data[0].shape[1]
@@ -376,11 +384,9 @@ class ClustreamKmeans(CentroidClusteringAnomalyDetector):
 
         self.centroids = np.array(centroids)
 
-        self._calculate_distances(data_rad)
+        self._calculate_distances(validation_data)
 
-        self.trained = True
-
-        alpha, metric_val = self._set_radiuses(data[0], metric=metric)
+        alpha, metric_val = self._set_radiuses(validation_data[0], metric=metric)
 
         return alpha, metric_val
 
@@ -521,27 +527,222 @@ class WeightedAffinityPropagation(CentroidClusteringAnomalyDetector):
         return xmin, xmax, C, W
 
 
+class Svdd(tf.keras.models.Model):
+
+    def __init__(self, preprocessor, nu=0.05):
+        super(Svdd, self).__init__()
+        self.nu = nu
+        self.preprocessor = preprocessor
+        self.loss_tracker = tf.keras.metrics.Mean(name='loss')
+        self.built = False
+
+    def build(self, input_shape, X):
+        input_dims = input_shape[1:]
+        self.input_spec = tf.keras.layers.InputSpec(dtype=tf.float32, shape=(None, *input_dims))
+        self.c = tf.reduce_mean(self.preprocessor(X), 0)
+        self.R = self.add_weight(shape=[], initializer='glorot_uniform', name='R', trainable=False)
+        self.built = True
+
+    def call(self, x):
+        x = tf.cast(x, tf.float32)
+        x = self.preprocessor(x)
+        dists = tf.reduce_sum(tf.square(x - self.c), axis=-1)
+        scores = dists - self.R ** 2
+        return scores
+
+    def train_step(self, data):
+        inputs, outputs = data
+        with tf.GradientTape() as tape:
+            x = self.preprocessor(inputs)
+            dists = tf.reduce_sum(tf.square(x - self.c), axis=-1)
+            scores = dists - self.R ** 2
+            penalty = tf.maximum(scores, tf.zeros_like(scores))
+            loss = self.R ** 2 + (1 / self.nu) * penalty
+
+        grads = tape.gradient(loss, self.trainable_weights)
+        self.optimizer.apply_gradients(zip(grads, self.trainable_weights))
+        self.loss_tracker.update_state(loss)
+
+        test = tf.sort(tf.math.sqrt(dists))[tf.cast((1 - self.nu) * tf.math.reduce_sum(tf.ones_like(dists)), tf.int32)]
+        self.R.assign(test)
+
+        return {
+            "loss": self.loss_tracker.result()
+        }
+
+    def test_step(self, data):
+        if len(data) == 2:
+            inputs, outputs = data
+        else:
+            inputs, outputs = data[0]
+        x = self.preprocessor(inputs)
+        dists = tf.reduce_sum(tf.square(x - self.c), axis=-1)
+        scores = dists - self.R ** 2
+        penalty = tf.maximum(scores, tf.zeros_like(scores))
+        loss = self.R ** 2 + (1 / self.nu) * penalty
+        self.loss_tracker.update_state(loss)
+        return {
+            "loss": self.loss_tracker.result()
+        }
+
+
+class DeepAnomalyDetector(AnomalyDetector):
+
+    def __init__(self):
+        super(DeepAnomalyDetector, self).__init__()
+
+    def _train_encoder(self, data, validation_data, encoder_units=[64, 32, 16], epochs=10000, batch_size=512, lr=1e-4, patience=100, eps=1e-10):
+        inp_shape = data[0].shape[1:]
+
+        inputs = tf.keras.layers.Input(shape=inp_shape)
+        hidden = inputs
+
+        for units in encoder_units[:-1]:
+            hidden = tf.keras.layers.Dense(units=units)(hidden)
+            hidden = tf.keras.layers.BatchNormalization()(hidden)
+            hidden = tf.keras.layers.ReLU()(hidden)
+
+        encoded = tf.keras.layers.Dense(units=encoder_units[-1])(hidden)
+        self.encoder = tf.keras.models.Model(inputs, encoded)
+
+        for units in encoder_units[:-1][::-1]:
+            hidden = tf.keras.layers.Dense(units=units)(encoded)
+            hidden = tf.keras.layers.BatchNormalization()(hidden)
+            hidden = tf.keras.layers.ReLU()(hidden)
+
+        hidden = tf.keras.layers.Dense(units=np.prod(inp_shape))(hidden)
+        outputs = tf.keras.layers.Reshape(inp_shape)(hidden)
+
+        autoencoder = tf.keras.models.Model(inputs, outputs)
+        autoencoder.compile(loss='mean_squared_error', optimizer=tf.keras.optimizers.Adam(learning_rate=lr))
+
+        autoencoder.fit(
+            (data[0] - self.xmin[None, :]) / (self.xmax[None, :] - self.xmin[None, :] + eps), data[1],
+            validation_data=((validation_data[0] - self.xmin[None, :]) / (self.xmax[None, :] - self.xmin[None, :] + eps), validation_data[1]),
+            epochs=epochs,
+            batch_size=batch_size,
+            callbacks=[
+                tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=patience, mode='min', restore_best_weights=True)
+            ]
+        )
+
+        for e_layer, a_layer in zip(self.encoder.weights, autoencoder.weights):
+            e_layer.assign(a_layer)
+
+    def tsne_plot(self, data, fig_dir=FIG_DIR, labels=['Normal', 'Defective'], prefix=None, eps=1e-10, n_samples=2000):
+        nc = self.centroids.shape[0]
+        X_plot = np.vstack([
+            (data[0][:n_samples, :] - self.xmin[None, :]) / (self.xmax[None, :] - self.xmin[None, :] + eps),
+            (self.centroids - self.xmin[None, :]) / (self.xmax[None, :] - self.xmin[None, :] + eps),
+        ])
+        tsne = TSNE(n_components=2, learning_rate='auto', init='random')
+        X_tsne = tsne.fit_transform(X_plot)
+        pp.style.use('default')
+        pp.figure(figsize=(12, 7))
+        scatter_centroids = pp.scatter(X_tsne[:nc, 0], X_tsne[:nc, 1], c=np.zeros(nc), s=self.weights / np.sum(self.weights) * 2000, alpha=0.5);
+        scatter_points = pp.scatter(X_tsne[nc:, 0], X_tsne[nc:, 1], c=data[1][:n_samples], s=10, cmap='Accent', marker='x')
+        pp.xlabel('t-SNE feature 1', fontsize=10)
+        pp.ylabel('t-SNE feature 2', fontsize=10)
+        pp.legend(
+            scatter_points.legend_elements()[0] + scatter_centroids.legend_elements()[0],
+            labels + ['cluster centroids'],
+            loc=0
+        )
+        fname = f'{prefix}_' if prefix is not None else ''
+        fname += 'tsne.pdf'
+        pp.savefig(osp.join(fig_dir, fname))
+        pp.close()
+
+
+class DeepSvdd(DeepAnomalyDetector):
+
+    def __init__(self):
+        super(DeepSvdd, self).__init__()
+
+    def _calculate_distances(self, data, eps=1e-10):
+        p = np.clip(self.model.predict(data[0]), 0, np.inf)
+        self.radiuses = np.array([np.mean(p), np.std(p), np.max(p)]).reshape(1, -1)
+
+    def predict(self, data, alpha, eps=1e-10, standardize=True):
+        radiuses = self.radiuses[:, 0] + alpha * self.radiuses[:, 1]
+        if standardize:
+            E_te_ = (data - self.xmin[None, :]) / (self.xmax[None, :] - self.xmin[None, :] + eps)
+        else:
+            E_te_ = data
+        E_te_ = np.array(E_te_, dtype=np.float32)
+        dists_te = self.model(E_te_).numpy()
+        nte = E_te_.shape[0]
+        pred_thrs = radiuses[0]
+        predictions = np.zeros(nte)
+        predictions[np.where(dists_te > pred_thrs)[0]] = 1
+        scores = (pred_thrs - dists_te) / (pred_thrs + 1e-10)
+        return predictions, scores
+
+    def _set_radiuses(self, data, metric='em', alpha=3, n_generated=100000):
+        n_features = data.shape[1]
+        volume_support = (np.ones(n_features) - np.zeros(n_features)).prod()
+        X_unif = np.random.uniform(np.zeros(n_features), np.ones(n_features), size=(n_generated, n_features))
+        metric_fun = getattr(self, f'_{metric}')
+        alpha = np.maximum(alpha, np.max((self.radiuses[:, 2] - self.radiuses[:, 0]) / (self.radiuses[:, 1] + 1e-10)))
+        _, s_X = self.predict(data, alpha)
+        assert s_X is not None
+        _, s_U = self.predict(X_unif, alpha, standardize=False)
+        assert s_U is not None
+        metric_val = metric_fun(volume_support, s_U, s_X, n_generated)[0]
+        return alpha, metric_val
+
+    def fit(self, data, validation_data, hp, metric='em', epochs=10000, batch_size=512, lr=1e-4, patience=100, eps=1e-10):
+
+        self.xmin = np.min(data[0], 0)
+        self.xmax = np.max(data[0], 0)
+
+        self._train_encoder(data, validation_data)
+
+        inp_shape = data[0].shape[1:]
+
+        self.model = Svdd(preprocessor=self.encoder, nu=hp)
+        self.model.build(input_shape=(None, *inp_shape), X=data[0])
+        self.model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=lr))
+
+        self.model.fit(
+            (data[0] - self.xmin[None, :]) / (self.xmax[None, :] - self.xmin[None, :] + eps), data[1],
+            validation_data=((validation_data[0] - self.xmin[None, :]) / (self.xmax[None, :] - self.xmin[None, :] + eps), validation_data[1]),
+            epochs=epochs,
+            batch_size=batch_size,
+            callbacks=[
+                tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=patience, mode='min', restore_best_weights=True)
+            ]
+        )
+
+        self._calculate_distances(validation_data)
+
+        alpha, metric_val = self._set_radiuses(validation_data[0], metric=metric)
+
+        return alpha, metric_val
+
+
 if __name__ == '__main__':
 
-    methods = [
-        'ScalableKmeans',
-        'ClustreamKmeans',
-        'WeightedAffinityPropagation',
-        'WeightedCmeans',
-        'UbiquitousSom',
-        'GngOnline',
-        'GrowWhenRequired',
-        'IncrementalGng',
-        'Gstream'
-    ]
+    hyperparams = {
+        'Svdd': [],
+        'ScalableKmeans': [2, 3, 4, 5, 6, 7, 8, 9],
+        'ClustreamKmeans': [2, 3, 4, 5, 6, 7, 8, 9],
+        'WeighteAp': [2, 3, 4, 5, 6, 7, 8, 9],
+        'WeightedCmeans': [2, 3, 4, 5, 6, 7, 8, 9],
+        'UbiquitousSom': [],
+        'GngOnline': [],
+        'GrowWhenRequired': [],
+        'IncrementalGng': [],
+        'Gstream': [],
+        'DeepSvdd': [0.1, 0.01, 0.001]
+    }
 
     parser = arp.ArgumentParser(description='Test AD methods.')
     parser.add_argument('-d', '--dataset', help='Dataset name', default='fan', choices=['fan', 'bearing'])
-    parser.add_argument('-i', '--methods', help='Method index', type=int, default=[0, 1], nargs='+', choices=[i for i in range(len(methods))])
+    parser.add_argument('-i', '--methods', help='Method index', type=int, default=['DeepSvdd'], nargs='+', choices=[i for i in hyperparams.keys()])
     parser.add_argument('-t', '--tries', help='Number of tries', default=1, type=int)
-    parser.add_argument('-c', '--clusters', help='Cluster range', default=[2, 3, 4, 5, 6, 7, 8, 9], type=int, nargs='+')
     parser.add_argument('-m', '--metric', help='Metric', default='em', choices=['em', 'mv'])
-    parser.add_argument('-f', '--feature_extractors', help='Feature extractors', nargs='+', default=['raw'])
+    parser.add_argument('-f', '--feature_extractors', help='Feature extractors', nargs='+', default=['pam'])
     parser.add_argument('-n', '--n_samples', help='Number of samples', default=40000, type=int)
     parser.add_argument('-s', '--seed', help='Seed', default=0, type=int)
     parser.add_argument('-p', '--plot', help='Plot?', type=bool)
@@ -559,18 +760,17 @@ if __name__ == '__main__':
     target_dataset = load_dataset(data_fpath, series_len=32, series_step=1, labels=labels, feature_extractors=args.feature_extractors, n_samples=args.n_samples)
     data = split_data(target_dataset, shuffle_features=False)
 
-    cluster_range = args.clusters
     n_tries = args.tries
 
     acc_best, tpr_best, fpr_best, metric_best, method_best, n_clusters_best = 0, 0, 0, 0, None, 0
-    for i in args.methods:
-        method = locals()[methods[i]]
-        m = method()
+    for method in args.methods:
+        method_class = locals()[method]
+        m = method_class()
         acc_method = 0
-        for n_clusters in cluster_range:
+        for hp in hyperparams[method]:
             acc_sum, fpr_sum, tpr_sum, metric_sum = 0, 0, 0, 0
             for j in range(n_tries):
-                alpha, metric_val = m.fit(data['tr'], n_clusters=n_clusters, data_rad=data['val'], metric=args.metric)
+                alpha, metric_val = m.fit(data['tr'], validation_data=data['val'], hp=hp, metric=args.metric)
                 acc, fpr, tpr = m.evaluate(data['inf'], alpha)
                 acc_sum += acc
                 fpr_sum += fpr
@@ -592,9 +792,9 @@ if __name__ == '__main__':
                 tpr_best = tpr_sum / n_tries
                 fpr_best = fpr_sum / n_tries
                 method_best = m.__class__.__name__
-                n_clusters_best = n_clusters
+                hp_best = hp
                 if args.plot:
                     m.tsne_plot(data['inf'], prefix=dataset)
 
-            print(f'{m.__class__.__name__} with {n_clusters} clusters on average: acc = {acc_sum / n_tries}, fpr = {fpr_sum / n_tries}, tpr = {tpr_sum / n_tries}, {args.metric} = {metric_sum / n_tries}')
+            print(f'{m.__class__.__name__} with hyperparametere {hp} on average: acc = {acc_sum / n_tries}, fpr = {fpr_sum / n_tries}, tpr = {tpr_sum / n_tries}, {args.metric} = {metric_sum / n_tries}')
     print(f'The best is {method_best} with {n_clusters_best} clusters: acc = {acc_best}, fpr = {fpr_best}, tpr = {tpr_best}, {args.metric} = {metric_best}')
