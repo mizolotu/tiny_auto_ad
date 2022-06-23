@@ -114,6 +114,7 @@ class CentroidClusteringAnomalyDetector(AnomalyDetector):
 
     def evaluate(self, data, alpha):
         predictions, _ = self.predict(data[0], alpha)
+        print(f'AUC = {roc_auc_score(data[1], predictions)}')
         if predictions is not None:
             acc = len(np.where(predictions == data[1])[0]) / data[1].shape[0]
             fpr = len(np.where((predictions == 1) & (data[1] == 0))[0]) / (1e-10 + len(np.where(data[1] == 0)[0]))
@@ -671,12 +672,8 @@ class DeepSvdd(DeepAnomalyDetector):
         p = np.clip(self.model.predict(data[0]), 0, np.inf)
         self.radiuses = np.array([np.mean(p), np.std(p), np.max(p)]).reshape(1, -1)
 
-    def predict(self, data, alpha, eps=1e-10, standardize=False):
+    def predict(self, data, alpha, eps=1e-10):
         radiuses = self.radiuses[:, 0] + alpha * self.radiuses[:, 1]
-        if standardize:
-            E_te_ = (data - self.xmin[None, :]) / (self.xmax[None, :] - self.xmin[None, :] + eps)
-        else:
-            E_te_ = data
         E_te_ = np.array(E_te_, dtype=np.float32)
         dists_te = self.model(E_te_).numpy()
         nte = E_te_.shape[0]
@@ -694,7 +691,7 @@ class DeepSvdd(DeepAnomalyDetector):
         alpha = np.maximum(alpha, np.max((self.radiuses[:, 2] - self.radiuses[:, 0]) / (self.radiuses[:, 1] + 1e-10)))
         _, s_X = self.predict(data, alpha)
         assert s_X is not None
-        _, s_U = self.predict(X_unif, alpha, standardize=False)
+        _, s_U = self.predict(X_unif, alpha)
         assert s_U is not None
         metric_val = metric_fun(volume_support, s_U, s_X, n_generated)[0]
         return alpha, metric_val
