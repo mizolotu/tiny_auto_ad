@@ -592,11 +592,14 @@ class DeepAnomalyDetector(AnomalyDetector):
     def __init__(self):
         super(DeepAnomalyDetector, self).__init__()
 
-    def _train_encoder(self, data, validation_data, encoder_units=[64, 32, 16], epochs=10000, batch_size=512, lr=1e-4, patience=100, eps=1e-10):
-        inp_shape = data[0].shape[1:]
+    def _train_encoder(self, data, validation_data, encoder_units=[64, 32, 16], epochs=1000, batch_size=512, lr=1e-4, patience=100, eps=1e-10):
 
+        inp_shape = data[0].shape[1:]
         inputs = tf.keras.layers.Input(shape=inp_shape)
-        hidden = inputs
+
+        tr_data = (data[0] - self.xmin[None, :]) / (self.xmax[None, :] - self.xmin[None, :] + eps)
+        val_data = (validation_data[0] - self.xmin[None, :]) / (self.xmax[None, :] - self.xmin[None, :] + eps)
+        hidden = (inputs - np.mean(tr_data, 0)[None, :]) / (np.std(tr_data, 0)[None, :] + 1e-10)
 
         for units in encoder_units[:-1]:
             hidden = tf.keras.layers.Dense(units=units)(hidden)
@@ -618,12 +621,8 @@ class DeepAnomalyDetector(AnomalyDetector):
         autoencoder.compile(loss='mean_squared_error', optimizer=tf.keras.optimizers.Adam(learning_rate=lr))
 
         autoencoder.fit(
-            (data[0] - self.xmin[None, :]) / (self.xmax[None, :] - self.xmin[None, :] + eps),
-            (data[0] - self.xmin[None, :]) / (self.xmax[None, :] - self.xmin[None, :] + eps),
-            validation_data=(
-                (validation_data[0] - self.xmin[None, :]) / (self.xmax[None, :] - self.xmin[None, :] + eps),
-                (validation_data[0] - self.xmin[None, :]) / (self.xmax[None, :] - self.xmin[None, :] + eps)
-            ),
+            tr_data, tr_data,
+            validation_data=(val_data, val_data),
             epochs=epochs,
             batch_size=batch_size,
             callbacks=[
@@ -743,12 +742,12 @@ if __name__ == '__main__':
     }
 
     parser = arp.ArgumentParser(description='Test AD methods.')
-    parser.add_argument('-d', '--dataset', help='Dataset name', default='fan', choices=['fan', 'bearing'])
+    parser.add_argument('-d', '--dataset', help='Dataset name', default='bearing', choices=['fan', 'bearing'])
     parser.add_argument('-i', '--methods', help='Method index', type=int, default=['DeepSvdd'], nargs='+', choices=[i for i in hyperparams.keys()])
     parser.add_argument('-t', '--tries', help='Number of tries', default=1, type=int)
     parser.add_argument('-m', '--metric', help='Metric', default='em', choices=['em', 'mv'])
-    parser.add_argument('-f', '--feature_extractors', help='Feature extractors', nargs='+', default=['pam'])
-    parser.add_argument('-n', '--n_samples', help='Number of samples', default=40000, type=int)
+    parser.add_argument('-f', '--feature_extractors', help='Feature extractors', nargs='+', default=['fft', 'pam'])
+    parser.add_argument('-n', '--n_samples', help='Number of samples', default=None, type=int)
     parser.add_argument('-s', '--seed', help='Seed', default=0, type=int)
     parser.add_argument('-p', '--plot', help='Plot?', type=bool)
     parser.add_argument('-g', '--gpu', help='GPU', default='-1')
