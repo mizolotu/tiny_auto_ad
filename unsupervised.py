@@ -596,7 +596,6 @@ class DeepAnomalyDetector(AnomalyDetector):
 
         inp_shape = data[0].shape[1:]
         inputs = tf.keras.layers.Input(shape=inp_shape)
-
         tr_data = (data[0] - self.xmin[None, :]) / (self.xmax[None, :] - self.xmin[None, :] + eps)
         val_data = (validation_data[0] - self.xmin[None, :]) / (self.xmax[None, :] - self.xmin[None, :] + eps)
         hidden = (inputs - np.mean(tr_data, 0)[None, :]) / (np.std(tr_data, 0)[None, :] + 1e-10)
@@ -703,14 +702,16 @@ class DeepSvdd(DeepAnomalyDetector):
         self._train_encoder(data, validation_data)
 
         inp_shape = data[0].shape[1:]
+        tr_data = (data[0] - self.xmin[None, :]) / (self.xmax[None, :] - self.xmin[None, :] + eps)
+        val_data = (validation_data[0] - self.xmin[None, :]) / (self.xmax[None, :] - self.xmin[None, :] + eps)
 
         self.model = Svdd(preprocessor=self.encoder, nu=hp)
-        self.model.build(input_shape=(None, *inp_shape), X=data[0])
+        self.model.build(input_shape=(None, *inp_shape), X=tr_data)
         self.model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=lr))
 
         self.model.fit(
-            (data[0] - self.xmin[None, :]) / (self.xmax[None, :] - self.xmin[None, :] + eps), data[1],
-            validation_data=((validation_data[0] - self.xmin[None, :]) / (self.xmax[None, :] - self.xmin[None, :] + eps), validation_data[1]),
+            tr_data, data[1],
+            validation_data=(val_data, validation_data[1]),
             epochs=epochs,
             batch_size=batch_size,
             callbacks=[
