@@ -96,12 +96,12 @@ if __name__ == '__main__':
 
     inp_shape = data['tr'][0].shape[1:]
 
-    tr_data_std = (data['tr'][0] - np.min(data['tr'][0], 0)[None, :]) / (np.max(data['tr'][0], 0)[None, :] - np.min(data['tr'][0], 0)[None, :] + 1e-10)
-    val_data_std = (data['val'][0] - np.min(data['tr'][0], 0)[None, :]) / (np.max(data['tr'][0], 0)[None, :] - np.min(data['tr'][0], 0)[None, :] + 1e-10)
+    tr_data_std = data['tr'][0] # (data['tr'][0] - np.min(data['tr'][0], 0)[None, :]) / (np.max(data['tr'][0], 0)[None, :] - np.min(data['tr'][0], 0)[None, :] + 1e-10)
+    val_data_std = data['val'][0] # (data['val'][0] - np.min(data['tr'][0], 0)[None, :]) / (np.max(data['tr'][0], 0)[None, :] - np.min(data['tr'][0], 0)[None, :] + 1e-10)
 
     inputs = tf.keras.layers.Input(shape=inp_shape)
-    #hidden = (inputs - np.mean(tr_data_std, 0)[None, :]) / (np.std(tr_data_std, 0)[None, :] + 1e-10)
-    hidden = inputs
+    hidden = (inputs - np.mean(tr_data_std, 0)[None, :]) / (np.std(tr_data_std, 0)[None, :] + 1e-10)
+    #hidden = inputs
     hidden = tf.keras.layers.Dense(units=64)(hidden)
     #hidden = tf.keras.layers.BatchNormalization()(hidden)
     hidden = tf.keras.layers.ReLU()(hidden)
@@ -124,7 +124,7 @@ if __name__ == '__main__':
     autoencoder.fit(
         tr_data_std, tr_data_std,
         validation_data=(val_data_std, val_data_std),
-        epochs=1,
+        epochs=10,
         batch_size=512,
         callbacks=[
             tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=100, mode='min', restore_best_weights=True)
