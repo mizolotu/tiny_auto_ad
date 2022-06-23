@@ -707,7 +707,6 @@ class DeepSvdd(DeepAnomalyDetector):
 
         for units in encoder_units[:-1]:
             hidden = tf.keras.layers.Dense(units=units)(hidden)
-            hidden = tf.keras.layers.BatchNormalization()(hidden)
             hidden = tf.keras.layers.ReLU()(hidden)
 
         encoded = tf.keras.layers.Dense(units=encoder_units[-1])(hidden)
