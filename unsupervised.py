@@ -152,7 +152,7 @@ class ScalableKmeans(CentroidClusteringAnomalyDetector):
     def __init__(self):
         super(ScalableKmeans, self).__init__()
 
-    def fit(self, data, validation_data, n_clusters=2, batch_size=16, l=4, n_iters=100, metric='em'):
+    def fit(self, data, validation_data, hp=2, batch_size=16, l=4, n_iters=100, metric='em'):
 
         n_features = data[0].shape[1]
 
@@ -166,6 +166,8 @@ class ScalableKmeans(CentroidClusteringAnomalyDetector):
         # the main clustering loop
 
         ntr = data[1].shape[0]
+
+        n_clusters = hp
 
         for i in range(0, ntr - batch_size, batch_size):
 
@@ -722,7 +724,8 @@ class DeepSvdd(DeepAnomalyDetector):
             batch_size=batch_size,
             callbacks=[
                 tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=patience, mode='min', restore_best_weights=True)
-            ]
+            ],
+            verbose=False
         )
 
         self._calculate_distances(validation_data)
