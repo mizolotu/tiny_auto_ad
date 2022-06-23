@@ -103,19 +103,19 @@ if __name__ == '__main__':
     #hidden = (inputs - np.mean(tr_data_std, 0)[None, :]) / (np.std(tr_data_std, 0)[None, :] + 1e-10)
     hidden = inputs
     hidden = tf.keras.layers.Dense(units=64)(hidden)
-    hidden = tf.keras.layers.BatchNormalization()(hidden)
+    #hidden = tf.keras.layers.BatchNormalization()(hidden)
     hidden = tf.keras.layers.ReLU()(hidden)
     hidden = tf.keras.layers.Dense(units=32)(hidden)
-    hidden = tf.keras.layers.BatchNormalization()(hidden)
+    #hidden = tf.keras.layers.BatchNormalization()(hidden)
     hidden = tf.keras.layers.ReLU()(hidden)
     encoded = tf.keras.layers.Dense(units=16)(hidden)
     encoder = tf.keras.models.Model(inputs, encoded)
 
     hidden = tf.keras.layers.Dense(units=32)(encoded)
-    hidden = tf.keras.layers.BatchNormalization()(hidden)
+    #hidden = tf.keras.layers.BatchNormalization()(hidden)
     hidden = tf.keras.layers.ReLU()(hidden)
     hidden = tf.keras.layers.Dense(units=64)(hidden)
-    hidden = tf.keras.layers.BatchNormalization()(hidden)
+    #hidden = tf.keras.layers.BatchNormalization()(hidden)
     hidden = tf.keras.layers.ReLU()(hidden)
     outputs = tf.keras.layers.Dense(units=inp_shape[0])(hidden)
 
@@ -124,15 +124,15 @@ if __name__ == '__main__':
     autoencoder.fit(
         tr_data_std, tr_data_std,
         validation_data=(val_data_std, val_data_std),
-        epochs=10000,
+        epochs=1,
         batch_size=512,
         callbacks=[
             tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=100, mode='min', restore_best_weights=True)
         ]
     )
 
-    for e_layer, a_layer in zip(encoder.weights, autoencoder.weights):
-        e_layer.assign(a_layer)
+    #for e_layer, a_layer in zip(encoder.weights, autoencoder.weights):
+    #    e_layer.assign(a_layer)
 
     model = Svdd(preprocessor=encoder, nu=0.01)
     model.build(input_shape=(None, *inp_shape), X=tr_data_std)
