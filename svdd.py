@@ -1,3 +1,4 @@
+import os
 import numpy as np
 import argparse as arp
 import os.path as osp
@@ -72,7 +73,13 @@ if __name__ == '__main__':
     parser.add_argument('-f', '--feature_extractors', help='Feature extractors', nargs='+', default=['pam'])
     parser.add_argument('-d', '--dataset', help='Dataset name', default='bearing', choices=['fan', 'bearing'])
     parser.add_argument('-s', '--seed', help='Seed', default=0, type=int)
+    parser.add_argument('-g', '--gpu', help='GPU', default='-1')
     args = parser.parse_args()
+
+    if args.gpu is None:
+        os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
+    else:
+        os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
 
     np.random.seed(args.seed)
     tf.random.set_seed(args.seed)
