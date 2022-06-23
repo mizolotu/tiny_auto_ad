@@ -124,15 +124,15 @@ if __name__ == '__main__':
     autoencoder.fit(
         tr_data_std, tr_data_std,
         validation_data=(val_data_std, val_data_std),
-        epochs=10,
+        epochs=10000,
         batch_size=512,
         callbacks=[
             tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=100, mode='min', restore_best_weights=True)
         ]
     )
 
-    #for e_layer, a_layer in zip(encoder.weights, autoencoder.weights):
-    #    e_layer.assign(a_layer)
+    for e_layer, a_layer in zip(encoder.weights, autoencoder.weights):
+        e_layer.assign(a_layer)
 
     model = Svdd(preprocessor=encoder, nu=0.01)
     model.build(input_shape=(None, *inp_shape), X=tr_data_std)
