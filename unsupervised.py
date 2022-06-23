@@ -632,6 +632,7 @@ class DeepAnomalyDetector(AnomalyDetector):
         for e_layer, a_layer in zip(self.encoder.weights, autoencoder.weights):
             e_layer.assign(a_layer)
 
+
     def tsne_plot(self, data, fig_dir=FIG_DIR, labels=['Normal', 'Defective'], prefix=None, eps=1e-10, n_samples=2000):
         nc = self.centroids.shape[0]
         X_plot = np.vstack([
@@ -666,7 +667,7 @@ class DeepSvdd(DeepAnomalyDetector):
         p = np.clip(self.model.predict(data[0]), 0, np.inf)
         self.radiuses = np.array([np.mean(p), np.std(p), np.max(p)]).reshape(1, -1)
 
-    def predict(self, data, alpha, eps=1e-10, standardize=True):
+    def predict(self, data, alpha, eps=1e-10, standardize=False):
         radiuses = self.radiuses[:, 0] + alpha * self.radiuses[:, 1]
         if standardize:
             E_te_ = (data - self.xmin[None, :]) / (self.xmax[None, :] - self.xmin[None, :] + eps)
@@ -694,24 +695,32 @@ class DeepSvdd(DeepAnomalyDetector):
         metric_val = metric_fun(volume_support, s_U, s_X, n_generated)[0]
         return alpha, metric_val
 
-    def fit(self, data, validation_data, hp, metric='em', epochs=10000, batch_size=512, lr=1e-4, patience=100, eps=1e-10):
+    def fit(self, data, validation_data, hp, metric='em', encoder_units=[64, 32, 16], epochs=10000, batch_size=512, lr=1e-4, patience=100, eps=1e-10):
 
         self.xmin = np.min(data[0], 0)
         self.xmax = np.max(data[0], 0)
 
-        self._train_encoder(data, validation_data)
+        #self._train_encoder(data, validation_data)
 
         inp_shape = data[0].shape[1:]
-        tr_data = (data[0] - self.xmin[None, :]) / (self.xmax[None, :] - self.xmin[None, :] + eps)
-        val_data = (validation_data[0] - self.xmin[None, :]) / (self.xmax[None, :] - self.xmin[None, :] + eps)
+        inputs = tf.keras.layers.Input(shape=inp_shape)
+        hidden = (inputs - np.mean(data[0], 0)[None, :]) / (np.std(data[0], 0)[None, :] + 1e-10)
+
+        for units in encoder_units[:-1]:
+            hidden = tf.keras.layers.Dense(units=units)(hidden)
+            hidden = tf.keras.layers.BatchNormalization()(hidden)
+            hidden = tf.keras.layers.ReLU()(hidden)
+
+        encoded = tf.keras.layers.Dense(units=encoder_units[-1])(hidden)
+        self.encoder = tf.keras.models.Model(inputs, encoded)
 
         self.model = Svdd(preprocessor=self.encoder, nu=hp)
-        self.model.build(input_shape=(None, *inp_shape), X=tr_data)
+        self.model.build(input_shape=(None, *inp_shape), X=data[0])
         self.model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=lr))
 
         self.model.fit(
-            tr_data, data[1],
-            validation_data=(val_data, validation_data[1]),
+            data[0], data[1],
+            validation_data=(validation_data[0], validation_data[1]),
             epochs=epochs,
             batch_size=batch_size,
             callbacks=[
