@@ -155,7 +155,7 @@ if __name__ == '__main__':
     model.summary()
 
     p = np.clip(model.predict(data['val'][0]), 0, np.inf)
-    alpha = 7
+    alpha = 9
     thr = np.mean(p) + alpha * np.std(p)
     predictions = np.zeros(len(data['inf'][1]))
     y_pred = np.clip(model.predict(data['inf'][0]), 0, 1)
