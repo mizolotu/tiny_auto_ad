@@ -84,12 +84,13 @@ class CentroidClusteringAnomalyDetector(AnomalyDetector):
     def _set_radiuses(self, data, metric='em', alpha=3, n_generated=100000):
         n_features = data.shape[1]
         volume_support = (np.ones(n_features) - np.zeros(n_features)).prod()
-        X_unif = np.random.uniform(np.zeros(n_features), np.ones(n_features), size=(n_generated, n_features))
+        #X_unif = np.random.uniform(np.zeros(n_features), np.ones(n_features), size=(n_generated, n_features))
+        X_unif = np.random.uniform(self.xmin, self.xmax, size=(n_generated, n_features))
         metric_fun = getattr(self, f'_{metric}')
         alpha = np.maximum(alpha, np.max((self.radiuses[:, 2] - self.radiuses[:, 0]) / (self.radiuses[:, 1] + 1e-10)))
         _, s_X = self.predict(data, alpha)
         assert s_X is not None
-        _, s_U = self.predict(X_unif, alpha, standardize=False)
+        _, s_U = self.predict(X_unif, alpha)
         assert s_U is not None
         metric_val = metric_fun(volume_support, s_U, s_X, n_generated)[0]
         return alpha, metric_val
@@ -688,7 +689,7 @@ class DeepSvdd(DeepAnomalyDetector):
     def _set_radiuses(self, data, metric='em', alpha=3, n_generated=100000):
         n_features = data.shape[1]
         volume_support = (np.ones(n_features) - np.zeros(n_features)).prod()
-        X_unif = np.random.uniform(np.zeros(n_features), np.ones(n_features), size=(n_generated, n_features))
+        X_unif = np.random.uniform(self.xmin, self.xmax, size=(n_generated, n_features))
         metric_fun = getattr(self, f'_{metric}')
         alpha = np.maximum(alpha, np.max((self.radiuses[:, 2] - self.radiuses[:, 0]) / (self.radiuses[:, 1] + 1e-10)))
         _, s_X = self.predict(data, alpha)
@@ -700,7 +701,8 @@ class DeepSvdd(DeepAnomalyDetector):
 
     def fit(self, data, validation_data, hp, metric='em', encoder_units=[64, 32, 16], epochs=10000, batch_size=512, lr=1e-4, patience=100, eps=1e-10):
 
-        #self._train_encoder(data, validation_data)
+        self.xmin = np.min(data[0], 0)
+        self.xmax = np.max(data[0], 0)
 
         inp_shape = data[0].shape[1:]
         inputs = tf.keras.layers.Input(shape=inp_shape)
@@ -754,7 +756,7 @@ if __name__ == '__main__':
 
     parser = arp.ArgumentParser(description='Test AD methods.')
     parser.add_argument('-d', '--dataset', help='Dataset name', default='bearing', choices=['fan', 'bearing'])
-    parser.add_argument('-i', '--methods', help='Method index', type=int, default=['ClustreamKmeans', 'DeepSvdd'], nargs='+', choices=[i for i in hyperparams.keys()])
+    parser.add_argument('-a', '--algorithms', help='Algorithms', type=int, default=['ClustreamKmeans', 'DeepSvdd'], nargs='+', choices=[i for i in hyperparams.keys()])
     parser.add_argument('-t', '--tries', help='Number of tries', default=1, type=int)
     parser.add_argument('-m', '--metric', help='Metric', default='em', choices=['em', 'mv'])
     parser.add_argument('-f', '--feature_extractors', help='Feature extractors', nargs='+', default=['fft', 'pam'])
@@ -784,7 +786,7 @@ if __name__ == '__main__':
     n_tries = args.tries
 
     acc_best, tpr_best, fpr_best, metric_best, method_best, n_clusters_best = 0, 0, 0, 0, None, 0
-    for method in args.methods:
+    for method in args.algorithms:
         method_class = locals()[method]
         m = method_class()
         acc_method = 0
