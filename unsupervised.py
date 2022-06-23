@@ -1,3 +1,4 @@
+import os
 import numpy as np
 import argparse as arp
 import os.path as osp
@@ -617,8 +618,12 @@ class DeepAnomalyDetector(AnomalyDetector):
         autoencoder.compile(loss='mean_squared_error', optimizer=tf.keras.optimizers.Adam(learning_rate=lr))
 
         autoencoder.fit(
-            (data[0] - self.xmin[None, :]) / (self.xmax[None, :] - self.xmin[None, :] + eps), data[1],
-            validation_data=((validation_data[0] - self.xmin[None, :]) / (self.xmax[None, :] - self.xmin[None, :] + eps), validation_data[1]),
+            (data[0] - self.xmin[None, :]) / (self.xmax[None, :] - self.xmin[None, :] + eps),
+            (data[0] - self.xmin[None, :]) / (self.xmax[None, :] - self.xmin[None, :] + eps),
+            validation_data=(
+                (validation_data[0] - self.xmin[None, :]) / (self.xmax[None, :] - self.xmin[None, :] + eps),
+                (validation_data[0] - self.xmin[None, :]) / (self.xmax[None, :] - self.xmin[None, :] + eps)
+            ),
             epochs=epochs,
             batch_size=batch_size,
             callbacks=[
@@ -746,7 +751,13 @@ if __name__ == '__main__':
     parser.add_argument('-n', '--n_samples', help='Number of samples', default=40000, type=int)
     parser.add_argument('-s', '--seed', help='Seed', default=0, type=int)
     parser.add_argument('-p', '--plot', help='Plot?', type=bool)
+    parser.add_argument('-g', '--gpu', help='GPU', default='-1')
     args = parser.parse_args()
+
+    if args.gpu is None:
+        os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
+    else:
+        os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
 
     np.random.seed(args.seed)
 
