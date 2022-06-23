@@ -140,8 +140,8 @@ if __name__ == '__main__':
     model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=1e-4))
 
     model.fit(
-        *data['tr'],
-        validation_data=(data['val'][0], data['val'][1]),
+        tr_data_std, data['tr'][1],
+        validation_data=(val_data_std, data['val'][1]),
         epochs=10000,
         batch_size=512,
         callbacks=[
