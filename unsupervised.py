@@ -674,7 +674,7 @@ class DeepSvdd(DeepAnomalyDetector):
 
     def predict(self, data, alpha, eps=1e-10):
         radiuses = self.radiuses[:, 0] + alpha * self.radiuses[:, 1]
-        E_te_ = np.array(E_te_, dtype=np.float32)
+        E_te_ = np.array(data, dtype=np.float32)
         dists_te = self.model(E_te_).numpy()
         nte = E_te_.shape[0]
         pred_thrs = radiuses[0]
