@@ -696,7 +696,7 @@ class DeepSvdd(DeepAnomalyDetector):
         metric_val = metric_fun(volume_support, s_U, s_X, n_generated)[0]
         return alpha, metric_val
 
-    def fit(self, data, validation_data, hp, metric='em', encoder_units=[64, 32, 16], epochs=10000, batch_size=512, lr=1e-4, patience=100, eps=1e-10):
+    def fit(self, data, validation_data, hp, metric='em', encoder_units=[64, 32, 16], epochs=10000, batch_size=512, lr=1e-3, patience=100, eps=1e-10):
 
         self.xmin = np.min(data[0], 0)
         self.xmax = np.max(data[0], 0)
