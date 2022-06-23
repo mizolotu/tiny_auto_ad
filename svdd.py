@@ -90,7 +90,8 @@ if __name__ == '__main__':
     inp_shape = data['tr'][0].shape[1:]
 
     inputs = tf.keras.layers.Input(shape=inp_shape)
-    hidden = (inputs - np.mean(data['tr'][0], 0)[None, :]) / (np.std(data['tr'][0], 0)[None, :] + 1e-10)
+    #hidden = (inputs - np.mean(data['tr'][0], 0)[None, :]) / (np.std(data['tr'][0], 0)[None, :] + 1e-10)
+    hidden = (inputs - np.min(data['tr'][0], 0)[None, :]) / (np.max(data['tr'][0], 0)[None, :] - np.min(data['tr'][0], 0)[None, :] + 1e-10)
     hidden = tf.keras.layers.Dense(units=64)(hidden)
     hidden = tf.keras.layers.BatchNormalization()(hidden)
     hidden = tf.keras.layers.ReLU()(hidden)
