@@ -697,9 +697,6 @@ class DeepSvdd(DeepAnomalyDetector):
 
     def fit(self, data, validation_data, hp, metric='em', encoder_units=[64, 32, 16], epochs=10000, batch_size=512, lr=1e-4, patience=100, eps=1e-10):
 
-        self.xmin = np.min(data[0], 0)
-        self.xmax = np.max(data[0], 0)
-
         #self._train_encoder(data, validation_data)
 
         inp_shape = data[0].shape[1:]
@@ -748,12 +745,12 @@ if __name__ == '__main__':
         'GrowWhenRequired': [],
         'IncrementalGng': [],
         'Gstream': [],
-        'DeepSvdd': [0.1, 0.01, 0.001]
+        'DeepSvdd': [0.1, 0.01, 0.001, 0.0001]
     }
 
     parser = arp.ArgumentParser(description='Test AD methods.')
     parser.add_argument('-d', '--dataset', help='Dataset name', default='bearing', choices=['fan', 'bearing'])
-    parser.add_argument('-i', '--methods', help='Method index', type=int, default=['DeepSvdd'], nargs='+', choices=[i for i in hyperparams.keys()])
+    parser.add_argument('-i', '--methods', help='Method index', type=int, default=['ClustreamKmeans', 'DeepSvdd'], nargs='+', choices=[i for i in hyperparams.keys()])
     parser.add_argument('-t', '--tries', help='Number of tries', default=1, type=int)
     parser.add_argument('-m', '--metric', help='Metric', default='em', choices=['em', 'mv'])
     parser.add_argument('-f', '--feature_extractors', help='Feature extractors', nargs='+', default=['fft', 'pam'])
