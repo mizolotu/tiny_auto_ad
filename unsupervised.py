@@ -752,7 +752,7 @@ if __name__ == '__main__':
 
     parser = arp.ArgumentParser(description='Test AD methods.')
     parser.add_argument('-d', '--dataset', help='Dataset name', default='bearing', choices=['fan', 'bearing'])
-    parser.add_argument('-a', '--algorithms', help='Algorithms', type=int, default=['ClustreamKmeans', 'DeepSvdd'], nargs='+', choices=[i for i in hyperparams.keys()])
+    parser.add_argument('-a', '--algorithms', help='Algorithms', default=['ClustreamKmeans', 'DeepSvdd'], nargs='+', choices=[i for i in hyperparams.keys()])
     parser.add_argument('-t', '--tries', help='Number of tries', default=1, type=int)
     parser.add_argument('-m', '--metric', help='Metric', default='em', choices=['em', 'mv'])
     parser.add_argument('-f', '--feature_extractors', help='Feature extractors', nargs='+', default=['fft', 'pam'])
