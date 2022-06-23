@@ -592,7 +592,7 @@ class DeepAnomalyDetector(AnomalyDetector):
     def __init__(self):
         super(DeepAnomalyDetector, self).__init__()
 
-    def _train_encoder(self, data, validation_data, encoder_units=[64, 32, 16], epochs=1000, batch_size=512, lr=1e-4, patience=100, eps=1e-10):
+    def _train_encoder(self, data, validation_data, encoder_units=[64, 32, 16], epochs=10000, batch_size=512, lr=1e-4, patience=100, eps=1e-10):
 
         inp_shape = data[0].shape[1:]
         inputs = tf.keras.layers.Input(shape=inp_shape)
