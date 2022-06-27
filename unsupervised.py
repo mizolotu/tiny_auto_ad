@@ -745,7 +745,7 @@ if __name__ == '__main__':
         'UbiquitousSom': [],
         'GngOnline': [],
         'GrowWhenRequired': [],
-        'IncrementalGng': [],-g 0
+        'IncrementalGng': [],
         'Gstream': [],
         'DeepSvdd': [0.1, 0.01, 0.001, 0.0001]
     }
