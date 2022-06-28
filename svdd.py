@@ -70,7 +70,7 @@ class Svdd(tf.keras.models.Model):
 if __name__ == '__main__':
 
     parser = arp.ArgumentParser(description='Test supervised methods.')
-    parser.add_argument('-f', '--feature_extractors', help='Feature extractors', nargs='+', default=['pam'])
+    parser.add_argument('-f', '--feature_extractors', help='Feature extractors', nargs='+', default=['fft', 'pam'])
     parser.add_argument('-d', '--dataset', help='Dataset name', default='bearing', choices=['fan', 'bearing'])
     parser.add_argument('-s', '--seed', help='Seed', default=0, type=int)
     parser.add_argument('-g', '--gpu', help='GPU', default='-1')
@@ -166,10 +166,10 @@ if __name__ == '__main__':
     auc = roc_auc_score(data['inf'][1], y_pred)
     print(f'Accuracy = {acc}, TPR = {tpr}, FPR = {fpr}, AUC = {auc}')
     fpr, tpr, thresholds = roc_curve(data['inf'][1], y_pred)
-    pp.plot(fpr, tpr)
+    pp.plot(fpr, tpr, 'o')
     pp.xlabel('FPR')
     pp.ylabel('TPR')
-    pp.savefig('svdd.png')
+    pp.savefig('svdd_roc.png')
     pp.close()
 
 
