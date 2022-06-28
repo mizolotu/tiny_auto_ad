@@ -72,7 +72,6 @@ class SOM(tf.keras.models.Model):
     def call(self, x):
         x = (x - self.x_mean) / (self.x_std + 1e-10)
         x = self.som_layer(x)
-        print(x)
         s = tf.sort(x, axis=1)
         spl = tf.split(s, [self.nnn, self.nprototypes - self.nnn], axis=1)
         return tf.reduce_mean(spl[0], axis=1)
@@ -171,6 +170,7 @@ if __name__ == '__main__':
     #inf_data_std = (data['inf'][0] - np.mean(data['tr'][0], 0)[None, :]) / (np.std(data['tr'][0], 0)[None, :] + 1e-10)
     tr_data_std = data['tr'][0]
     val_data_std = data['val'][0]
+    inf_data_std = data['inf'][0]
 
     model = SOM([64, 64], batchnorm=False, x_mean=np.mean(data['tr'][0], 0)[None, :], x_std=np.std(data['tr'][0], 0)[None, :])
     model.build(input_shape=(None, inp_shape[0]))
@@ -187,11 +187,13 @@ if __name__ == '__main__':
     )
 
     model.summary()
+    print(model.predict(val_data_std))
+    print(model.predict(inf_data_std))
     p = np.clip(model.predict(val_data_std), 0, np.inf)
     alpha = 3
     thr = np.mean(p) + alpha * np.std(p)
     predictions = np.zeros(len(data['inf'][1]))
-    y_pred = np.clip(model.predict(data['inf'][0]), 0, 1)
+    y_pred = np.clip(model.predict(inf_data_std), 0, 1)
     print(y_pred, thr, np.mean(p), np.std(p))
     predictions[np.where(y_pred > thr)[0]] = 1
     acc = len(np.where(predictions == data['inf'][1])[0]) / data['inf'][1].shape[0]
