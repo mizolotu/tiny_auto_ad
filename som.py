@@ -187,10 +187,11 @@ if __name__ == '__main__':
 
     model.summary()
     p = np.clip(model.predict(data['val'][0]), 0, np.inf)
-    alpha = 1
+    alpha = 3
     thr = np.mean(p) + alpha * np.std(p)
     predictions = np.zeros(len(data['inf'][1]))
     y_pred = np.clip(model.predict(data['inf'][0]), 0, 1)
+    print(y_pred, thr)
     predictions[np.where(y_pred > thr)[0]] = 1
     acc = len(np.where(predictions == data['inf'][1])[0]) / data['inf'][1].shape[0]
     fpr = len(np.where((predictions == 1) & (data['inf'][1] == 0))[0]) / (1e-10 + len(np.where(data['inf'][1] == 0)[0]))
