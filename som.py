@@ -55,7 +55,6 @@ class SOM(tf.keras.models.Model):
         ranges = [np.arange(m) for m in map_size]
         mg = np.meshgrid(*ranges, indexing='ij')
         self.prototype_coordinates = tf.convert_to_tensor(np.array([item.flatten() for item in mg]).T)
-        self.bn_layer = tf.keras.layers.BatchNormalization(trainable=batchnorm)
         self.x_mean = x_mean
         self.x_std = x_std
         self.som_layer = SOMLayer(map_size, name='som_layer')
@@ -72,7 +71,6 @@ class SOM(tf.keras.models.Model):
 
     def call(self, x):
         x = (x - self.x_mean) / (self.x_std + 1e-10)
-        x = self.bn_layer(x)
         x = self.som_layer(x)
         print(x)
         s = tf.sort(x, axis=1)
