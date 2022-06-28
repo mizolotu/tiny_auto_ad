@@ -181,7 +181,7 @@ if __name__ == '__main__':
         epochs=10000,
         batch_size=512,
         callbacks=[
-            tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=100, mode='min', restore_best_weights=True)
+            tf.keras.callbacks.EarlyStopping(monitor='val_total_loss', patience=100, mode='min', restore_best_weights=True)
         ]
     )
 
