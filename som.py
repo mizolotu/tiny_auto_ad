@@ -164,14 +164,14 @@ if __name__ == '__main__':
 
     inp_shape = data['tr'][0].shape[1:]
 
-    #tr_data_std = (data['tr'][0] - np.min(data['tr'][0], 0)[None, :]) / (np.max(data['tr'][0], 0)[None, :] - np.min(data['tr'][0], 0)[None, :] + 1e-10)
-    #val_data_std = (data['val'][0] - np.min(data['tr'][0], 0)[None, :]) / (np.max(data['tr'][0], 0)[None, :] - np.min(data['tr'][0], 0)[None, :] + 1e-10)
-    #tr_data_std = (data['tr'][0] - np.mean(data['tr'][0], 0)[None, :]) / (np.std(data['tr'][0], 0)[None, :] + 1e-10)
-    #val_data_std = (data['val'][0] - np.mean(data['tr'][0], 0)[None, :]) / (np.std(data['tr'][0], 0)[None, :] + 1e-10)
-    tr_data_std = data['tr'][0]
-    val_data_std = data['val'][0]
+    tr_data_std = (data['tr'][0] - np.min(data['tr'][0], 0)[None, :]) / (np.max(data['tr'][0], 0)[None, :] - np.min(data['tr'][0], 0)[None, :] + 1e-10)
+    val_data_std = (data['val'][0] - np.min(data['tr'][0], 0)[None, :]) / (np.max(data['tr'][0], 0)[None, :] - np.min(data['tr'][0], 0)[None, :] + 1e-10)
+    tr_data_std = (data['tr'][0] - np.mean(data['tr'][0], 0)[None, :]) / (np.std(data['tr'][0], 0)[None, :] + 1e-10)
+    val_data_std = (data['val'][0] - np.mean(data['tr'][0], 0)[None, :]) / (np.std(data['tr'][0], 0)[None, :] + 1e-10)
+    #tr_data_std = data['tr'][0]
+    #val_data_std = data['val'][0]
 
-    model = SOM([64, 64], batchnorm=True)
+    model = SOM([64, 64], batchnorm=False)
     model.build(input_shape=(None, inp_shape[0]))
     model.compile(optimizer=tf.keras.optimizers.Adam(lr=1e-4))
 
