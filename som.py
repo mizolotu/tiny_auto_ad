@@ -31,7 +31,7 @@ class SOMLayer(tf.keras.layers.Layer):
         self.built = True
 
     def call(self, inputs, **kwargs):
-        d = tf.reduce_sum(tf.square(tf.expand_dims(inputs, axis=1) - self.prototypes), axis=-1)
+        d = tf.reduce_mean(tf.square(tf.expand_dims(inputs, axis=1) - self.prototypes), axis=-1)
         return d
 
     def compute_output_shape(self, input_shape):

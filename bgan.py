@@ -143,7 +143,7 @@ if __name__ == '__main__':
         labels = {0: ['normal'], 1: ['crack', 'sand']}
 
     data_fpath = osp.join(DATA_DIR, dataset)
-    target_dataset = load_dataset(data_fpath, series_len=32, series_step=1, labels=labels, feature_extractors=args.feature_extractors)
+    target_dataset = load_dataset(data_fpath, series_len=32, series_step=32, labels=labels, feature_extractors=args.feature_extractors)
     data = split_data(target_dataset, train_on_anomalies=False, validate_on_anomalies=False, shuffle_features=False)
 
     inp_shape = data['tr'][0].shape[1:]
@@ -164,8 +164,8 @@ if __name__ == '__main__':
 
 
     model.fit(
-        tr_data_std, np.hstack([np.random.uniform(data['tr'][0].shape[0], latent_dim), data['tr'][1]]),
-        validation_data=(val_data_std, np.hstack([np.random.uniform(data['val'][0].shape[0], latent_dim), data['val'][1]])),
+        tr_data_std, np.hstack([np.random.uniform((data['tr'][0].shape[0], latent_dim)), data['tr'][1]]),
+        validation_data=(val_data_std, np.hstack([np.random.uniform((data['val'][0].shape[0], latent_dim)), data['val'][1]])),
         epochs=10000,
         batch_size=512,
         callbacks=[
