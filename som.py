@@ -91,8 +91,7 @@ class SOM(tf.keras.models.Model):
         with tf.GradientTape() as tape:
 
             # Compute cluster assignments for batches
-
-            inputs = self.bn_layer(inputs)
+            inputs = (inputs - self.x_mean) / (self.x_std + 1e-10)
             d = self.som_layer(inputs)
             y_pred = tf.math.argmin(d, axis=1)
 
@@ -120,7 +119,7 @@ class SOM(tf.keras.models.Model):
 
     def test_step(self, data):
         inputs, outputs = data
-        inputs = self.bn_layer(inputs)
+        inputs = (inputs - self.x_mean) / (self.x_std + 1e-10)
         d = self.som_layer(inputs)
         y_pred = tf.math.argmin(d, axis=1)
         w_batch = self.neighborhood_function(self.map_dist(y_pred), self.T)
