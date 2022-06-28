@@ -73,6 +73,7 @@ class BGN(tf.keras.models.Model):
         print(z.shape, x_real.shape)
         x_fake = z
         for layer in self.generator_layers:
+            print(layer)
             x_fake = layer(x_fake)
         d_preds = tf.concat([x_fake, x_real], axis=0)
         for layer in self.discriminator_layers:

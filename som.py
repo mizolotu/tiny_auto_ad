@@ -174,7 +174,7 @@ if __name__ == '__main__':
 
     model = SOM([64, 64], batchnorm=False, x_mean=np.mean(data['tr'][0], 0)[None, :], x_std=np.std(data['tr'][0], 0)[None, :])
     model.build(input_shape=(None, inp_shape[0]))
-    model.compile(optimizer=tf.keras.optimizers.Adam(lr=1e-4))
+    model.compile(optimizer=tf.keras.optimizers.Adam(lr=1e-3))
 
     model.fit(
         tr_data_std, data['tr'][1],
