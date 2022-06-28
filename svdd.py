@@ -155,7 +155,7 @@ if __name__ == '__main__':
     model.summary()
 
     p = np.clip(model.predict(data['val'][0]), 0, np.inf)
-    alpha = 11
+    alpha = 3
     thr = np.mean(p) + alpha * np.std(p)
     predictions = np.zeros(len(data['inf'][1]))
     y_pred = np.clip(model.predict(data['inf'][0]), 0, 1)
@@ -166,8 +166,10 @@ if __name__ == '__main__':
     auc = roc_auc_score(data['inf'][1], y_pred)
     print(f'Accuracy = {acc}, TPR = {tpr}, FPR = {fpr}, AUC = {auc}')
     fpr, tpr, thresholds = roc_curve(data['inf'][1], y_pred)
-    pp.plot(fpr, tpr, '.')
-    pp.savefig('tmp.png')
+    pp.plot(fpr, tpr)
+    pp.xlabel('FPR')
+    pp.ylabel('TPR')
+    pp.savefig('svdd.png')
     pp.close()
 
 
