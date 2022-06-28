@@ -175,7 +175,7 @@ if __name__ == '__main__':
     tr_data_std = data['tr'][0]
     val_data_std = data['val'][0]
 
-    model = SOM([64, 64], batchnorm=False, x_mean=np.mean(data['tr'][0], 0), x_std=np.std(data['tr'][0], 0))
+    model = SOM([64, 64], batchnorm=False, x_mean=np.mean(data['tr'][0], 0)[None, :], x_std=np.std(data['tr'][0], 0)[None, :])
     model.build(input_shape=(None, inp_shape[0]))
     model.compile(optimizer=tf.keras.optimizers.Adam(lr=1e-4))
 
@@ -194,7 +194,7 @@ if __name__ == '__main__':
     alpha = 3
     thr = np.mean(p) + alpha * np.std(p)
     predictions = np.zeros(len(data['inf'][1]))
-    y_pred = np.clip(model.predict(inf_data_std), 0, 1)
+    y_pred = np.clip(model.predict(data['inf'][0]), 0, 1)
     print(y_pred, thr)
     predictions[np.where(y_pred > thr)[0]] = 1
     acc = len(np.where(predictions == data['inf'][1])[0]) / data['inf'][1].shape[0]
