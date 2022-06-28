@@ -48,7 +48,7 @@ def som_loss(weights, distances):
 
 class SOM(tf.keras.models.Model):
 
-    def __init__(self, map_size, batchnorm, T_min=0.1, T_max=10.0, niterations=10000, nnn=4):
+    def __init__(self, map_size, batchnorm, x_mean, x_std, T_min=0.1, T_max=10.0, niterations=10000, nnn=4):
         super(SOM, self).__init__()
         self.map_size = map_size
         self.nprototypes = np.prod(map_size)
@@ -56,6 +56,8 @@ class SOM(tf.keras.models.Model):
         mg = np.meshgrid(*ranges, indexing='ij')
         self.prototype_coordinates = tf.convert_to_tensor(np.array([item.flatten() for item in mg]).T)
         self.bn_layer = tf.keras.layers.BatchNormalization(trainable=batchnorm)
+        self.x_mean = x_mean
+        self.x_std = x_std
         self.som_layer = SOMLayer(map_size, name='som_layer')
         self.T_min = T_min
         self.T_max = T_max
@@ -69,6 +71,7 @@ class SOM(tf.keras.models.Model):
         return self.som_layer.get_weights()[0]
 
     def call(self, x):
+        x = (x - self.x_mean) / (self.x_std + 1e-10)
         x = self.bn_layer(x)
         x = self.som_layer(x)
         print(x)
@@ -166,13 +169,13 @@ if __name__ == '__main__':
 
     #tr_data_std = (data['tr'][0] - np.min(data['tr'][0], 0)[None, :]) / (np.max(data['tr'][0], 0)[None, :] - np.min(data['tr'][0], 0)[None, :] + 1e-10)
     #val_data_std = (data['val'][0] - np.min(data['tr'][0], 0)[None, :]) / (np.max(data['tr'][0], 0)[None, :] - np.min(data['tr'][0], 0)[None, :] + 1e-10)
-    tr_data_std = (data['tr'][0] - np.mean(data['tr'][0], 0)[None, :]) / (np.std(data['tr'][0], 0)[None, :] + 1e-10)
-    val_data_std = (data['val'][0] - np.mean(data['tr'][0], 0)[None, :]) / (np.std(data['tr'][0], 0)[None, :] + 1e-10)
-    inf_data_std = (data['inf'][0] - np.mean(data['tr'][0], 0)[None, :]) / (np.std(data['tr'][0], 0)[None, :] + 1e-10)
-    #tr_data_std = data['tr'][0]
-    #val_data_std = data['val'][0]
+    #tr_data_std = (data['tr'][0] - np.mean(data['tr'][0], 0)[None, :]) / (np.std(data['tr'][0], 0)[None, :] + 1e-10)
+    #val_data_std = (data['val'][0] - np.mean(data['tr'][0], 0)[None, :]) / (np.std(data['tr'][0], 0)[None, :] + 1e-10)
+    #inf_data_std = (data['inf'][0] - np.mean(data['tr'][0], 0)[None, :]) / (np.std(data['tr'][0], 0)[None, :] + 1e-10)
+    tr_data_std = data['tr'][0]
+    val_data_std = data['val'][0]
 
-    model = SOM([64, 64], batchnorm=False)
+    model = SOM([64, 64], batchnorm=False, x_mean=np.mean(data['tr'][0], 0), x_std=np.std(data['tr'][0], 0))
     model.build(input_shape=(None, inp_shape[0]))
     model.compile(optimizer=tf.keras.optimizers.Adam(lr=1e-4))
 

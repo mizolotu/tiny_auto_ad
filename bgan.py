@@ -67,10 +67,9 @@ class BGN(tf.keras.models.Model):
         return score[:, 0]
 
     def train_step(self, data):
-        x_real, label = data
-        #z, _ = tf.split(z_with_label, [self.latent_dim, 1], axis=1)
-        z = tf.random.uniform(shape=(x_real.shape[0], tf.constant(self.latent_dim)))
-        #z_with_labels = tf.concat([z, tf.reshape(label, (-1, 1))], axis=1)
+        x_real, z_with_label = data
+        z, _ = tf.split(z_with_label, [self.latent_dim, 1], axis=1)
+        print(z.shape, x_real.shape)
         z = tf.expand_dims(z, 1)
         x_fake = z
         for layer in self.generator_layers:
@@ -98,7 +97,6 @@ class BGN(tf.keras.models.Model):
     def test_step(self, data):
         x_real, z_with_label = data
         z, _ = tf.split(z_with_label, [self.latent_dim, 1], axis=1)
-        z = tf.expand_dims(z, 1)
         x_fake = z
         for layer in self.generator_layers:
             x_fake = layer(x_fake)
@@ -157,15 +155,17 @@ if __name__ == '__main__':
     tr_data_std = data['tr'][0]
     val_data_std = data['val'][0]
 
-    model = BGN(inp_shape[0], 3, [64, 32])
+    latent_dim = 3
+
+    model = BGN(inp_shape[0], latent_dim, [64, 32])
     model.build(input_shape=(None, inp_shape[0]))
     model.compile(optimizer=tf.keras.optimizers.Adam(lr=1e-4))
 
 
 
     model.fit(
-        tr_data_std, data['tr'][1],
-        validation_data=(val_data_std, data['val'][1]),
+        tr_data_std, np.hstack([np.random.uniform(data['tr'][0].shape[0], latent_dim), data['tr'][1]]),
+        validation_data=(val_data_std, np.hstack([np.random.uniform(data['val'][0].shape[0], latent_dim), data['val'][1]])),
         epochs=10000,
         batch_size=512,
         callbacks=[
