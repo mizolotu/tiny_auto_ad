@@ -164,10 +164,11 @@ if __name__ == '__main__':
 
     inp_shape = data['tr'][0].shape[1:]
 
-    tr_data_std = (data['tr'][0] - np.min(data['tr'][0], 0)[None, :]) / (np.max(data['tr'][0], 0)[None, :] - np.min(data['tr'][0], 0)[None, :] + 1e-10)
-    val_data_std = (data['val'][0] - np.min(data['tr'][0], 0)[None, :]) / (np.max(data['tr'][0], 0)[None, :] - np.min(data['tr'][0], 0)[None, :] + 1e-10)
+    #tr_data_std = (data['tr'][0] - np.min(data['tr'][0], 0)[None, :]) / (np.max(data['tr'][0], 0)[None, :] - np.min(data['tr'][0], 0)[None, :] + 1e-10)
+    #val_data_std = (data['val'][0] - np.min(data['tr'][0], 0)[None, :]) / (np.max(data['tr'][0], 0)[None, :] - np.min(data['tr'][0], 0)[None, :] + 1e-10)
     tr_data_std = (data['tr'][0] - np.mean(data['tr'][0], 0)[None, :]) / (np.std(data['tr'][0], 0)[None, :] + 1e-10)
     val_data_std = (data['val'][0] - np.mean(data['tr'][0], 0)[None, :]) / (np.std(data['tr'][0], 0)[None, :] + 1e-10)
+    inf_data_std = (data['inf'][0] - np.mean(data['tr'][0], 0)[None, :]) / (np.std(data['tr'][0], 0)[None, :] + 1e-10)
     #tr_data_std = data['tr'][0]
     #val_data_std = data['val'][0]
 
@@ -186,11 +187,11 @@ if __name__ == '__main__':
     )
 
     model.summary()
-    p = np.clip(model.predict(data['val'][0]), 0, np.inf)
+    p = np.clip(model.predict(val_data_std), 0, np.inf)
     alpha = 3
     thr = np.mean(p) + alpha * np.std(p)
     predictions = np.zeros(len(data['inf'][1]))
-    y_pred = np.clip(model.predict(data['inf'][0]), 0, 1)
+    y_pred = np.clip(model.predict(inf_data_std), 0, 1)
     print(y_pred, thr)
     predictions[np.where(y_pred > thr)[0]] = 1
     acc = len(np.where(predictions == data['inf'][1])[0]) / data['inf'][1].shape[0]

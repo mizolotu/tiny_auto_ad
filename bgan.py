@@ -67,8 +67,10 @@ class BGN(tf.keras.models.Model):
         return score[:, 0]
 
     def train_step(self, data):
-        x_real, z_with_label = data
-        z, _ = tf.split(z_with_label, [self.latent_dim, 1], axis=1)
+        x_real, label = data
+        #z, _ = tf.split(z_with_label, [self.latent_dim, 1], axis=1)
+        z = tf.random.uniform(shape=(x_real.shape[0], tf.constant(self.latent_dim)))
+        #z_with_labels = tf.concat([z, tf.reshape(label, (-1, 1))], axis=1)
         z = tf.expand_dims(z, 1)
         x_fake = z
         for layer in self.generator_layers:
@@ -158,6 +160,8 @@ if __name__ == '__main__':
     model = BGN(inp_shape[0], 3, [64, 32])
     model.build(input_shape=(None, inp_shape[0]))
     model.compile(optimizer=tf.keras.optimizers.Adam(lr=1e-4))
+
+
 
     model.fit(
         tr_data_std, data['tr'][1],
