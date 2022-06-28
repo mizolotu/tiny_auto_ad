@@ -160,8 +160,8 @@ class Kmeans(CentroidClusteringAnomalyDetector):
 
         # init min and max values, centroids, and their weights
 
-        self.xmin = np.min(data, 0)
-        self.xmax = np.max(data, 0)
+        self.xmin = np.min(data[0], 0)
+        self.xmax = np.max(data[0], 0)
 
         ntr = data[1].shape[0]
 
