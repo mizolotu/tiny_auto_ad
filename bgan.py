@@ -21,8 +21,9 @@ class BGN(tf.keras.models.Model):
         # generator
 
         self.generator_layers = []
-        for nunits in layers:
+        for nunits in layers[:-1]:
             self.generator_layers.append(tf.keras.layers.Dense(nunits))
+        self.generator_layers.append(tf.keras.layers.Dense(self.nfeatures))
 
         # discriminator
 
@@ -47,7 +48,6 @@ class BGN(tf.keras.models.Model):
         self.generator_layers[0].build(self.latent_dim,)
         for i in range(len(self.layers_) - 1):
             self.generator_layers[i + 1].build(input_shape=(None, self.layers_[i]))
-        self.generator_layers[-1].build(input_shape=(None, self.nfeatures))
         for i in range(len(self.generator_layers)):
             self.generator_trainable_variables.extend(self.generator_layers[i].trainable_variables)
 
@@ -160,7 +160,7 @@ if __name__ == '__main__':
 
     model = BGN(inp_shape[0], latent_dim, [64, 32])
     model.build(input_shape=(None, inp_shape[0]))
-    model.compile(optimizer=tf.keras.optimizers.Adam(lr=1e-4))
+    model.compile(optimizer=tf.keras.optimizers.Adam(lr=1e-3))
 
 
 
@@ -170,7 +170,7 @@ if __name__ == '__main__':
         epochs=10000,
         batch_size=512,
         callbacks=[
-            tf.keras.callbacks.EarlyStopping(monitor='val_total_loss', patience=100, mode='min', restore_best_weights=True)
+            tf.keras.callbacks.EarlyStopping(monitor='val_d_loss', patience=100, mode='min', restore_best_weights=True)
         ]
     )
 
@@ -191,7 +191,7 @@ if __name__ == '__main__':
     pp.plot(fpr, tpr)
     pp.xlabel('FPR')
     pp.ylabel('TPR')
-    pp.savefig('som_roc.png')
+    pp.savefig('bgn_roc.png')
     pp.close()
 
 
