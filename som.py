@@ -48,7 +48,7 @@ def som_loss(weights, distances):
 
 class SOM(tf.keras.models.Model):
 
-    def __init__(self, map_size, batchnorm, x_mean, x_std, T_min=0.1, T_max=10.0, niterations=10000, nnn=1):
+    def __init__(self, map_size, batchnorm, x_mean, x_std, T_min=0.1, T_max=10.0, niterations=10000, nnn=4):
         super(SOM, self).__init__()
         self.map_size = map_size
         self.nprototypes = np.prod(map_size)
@@ -172,7 +172,7 @@ if __name__ == '__main__':
     val_data_std = data['val'][0]
     inf_data_std = data['inf'][0]
 
-    model = SOM([4, 4], batchnorm=False, x_mean=np.mean(data['tr'][0], 0)[None, :], x_std=np.std(data['tr'][0], 0)[None, :])
+    model = SOM([10, 10], batchnorm=False, x_mean=np.mean(data['tr'][0], 0)[None, :], x_std=np.std(data['tr'][0], 0)[None, :])
     model.build(input_shape=(None, inp_shape[0]))
     model.compile(optimizer=tf.keras.optimizers.Adam(lr=1e-3))
 
