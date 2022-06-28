@@ -168,7 +168,7 @@ class Kmeans(CentroidClusteringAnomalyDetector):
         km = KMeans(n_clusters=hp)
         km.fit((data[0] - self.xmin[None, :]) / (self.xmax[None, :] - self.xmin[None, :] + 1e-10))
 
-        self.centroids = np.array(km.cluster_centers_)
+        self.centroids = np.array(km.cluster_centers_ * (self.xmax[None, :] - self.xmin[None, :] + 1e-10) + self.xmin[None, :])
 
         self._calculate_distances(validation_data)
 
