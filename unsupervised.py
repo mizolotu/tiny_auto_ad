@@ -5,11 +5,11 @@ import os.path as osp
 import tensorflow as tf
 
 from matplotlib import pyplot as pp
+from sklearn.cluster import KMeans
 from sklearn.manifold import TSNE
 from sklearn.metrics import auc, roc_auc_score, roc_curve
 from preprocess_data import load_dataset, split_data
 from config import *
-
 
 class AnomalyDetector:
 
@@ -147,6 +147,34 @@ class CentroidClusteringAnomalyDetector(AnomalyDetector):
         fname += 'tsne.pdf'
         pp.savefig(osp.join(fig_dir, fname))
         pp.close()
+
+
+class Kmeans(CentroidClusteringAnomalyDetector):
+
+    def __init__(self):
+        super(Kmeans, self).__init__()
+
+    def fit(self, data, validation_data, hp=2, batch_size=16, l=4, n_iters=100, metric='em'):
+
+        n_features = data[0].shape[1]
+
+        # init min and max values, centroids, and their weights
+
+        self.xmin = np.min(data, 0)
+        self.xmax = np.max(data, 0)
+
+        ntr = data[1].shape[0]
+
+        km = KMeans(n_clusters=hp)
+        km.fit((data - self.xmin[None, :]) / (self.xmax[None, :] - self.xmin[None, :] + 1e-10))
+
+        self.centroids = np.array(km.cluster_centers_)
+
+        self._calculate_distances(validation_data)
+
+        alpha, metric_val = self._set_radiuses(validation_data[0], metric=metric)
+
+        return alpha, metric_val
 
 
 class ScalableKmeans(CentroidClusteringAnomalyDetector):
@@ -737,7 +765,7 @@ class DeepSvdd(DeepAnomalyDetector):
 if __name__ == '__main__':
 
     hyperparams = {
-        'Svdd': [],
+        'Kmeans': [2, 3, 4, 5, 6, 7, 8, 9],
         'ScalableKmeans': [2, 3, 4, 5, 6, 7, 8, 9],
         'ClustreamKmeans': [2, 3, 4, 5, 6, 7, 8, 9],
         'WeighteAp': [2, 3, 4, 5, 6, 7, 8, 9],
@@ -747,12 +775,13 @@ if __name__ == '__main__':
         'GrowWhenRequired': [],
         'IncrementalGng': [],
         'Gstream': [],
+        'Svdd': [],
         'DeepSvdd': [0.1, 0.01, 0.001, 0.0001]
     }
 
     parser = arp.ArgumentParser(description='Test AD methods.')
     parser.add_argument('-d', '--dataset', help='Dataset name', default='bearing', choices=['fan', 'bearing'])
-    parser.add_argument('-a', '--algorithms', help='Algorithms', default=['ClustreamKmeans', 'DeepSvdd'], nargs='+', choices=[i for i in hyperparams.keys()])
+    parser.add_argument('-a', '--algorithms', help='Algorithms', default=['Kmeans'], nargs='+', choices=[i for i in hyperparams.keys()])
     parser.add_argument('-t', '--tries', help='Number of tries', default=1, type=int)
     parser.add_argument('-m', '--metric', help='Metric', default='em', choices=['em', 'mv'])
     parser.add_argument('-f', '--feature_extractors', help='Feature extractors', nargs='+', default=['fft', 'pam'])
