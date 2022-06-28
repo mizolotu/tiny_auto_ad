@@ -44,9 +44,10 @@ class BGN(tf.keras.models.Model):
         # generator
 
         self.generator_trainable_variables = []
-        self.generator_layers[0].build(input_shape)
+        self.generator_layers[0].build(self.latent_dim,)
         for i in range(len(self.layers_) - 1):
             self.generator_layers[i + 1].build(input_shape=(None, self.layers_[i]))
+        self.generator_layers[-1].build(input_shape=(None, self.nfeatures))
         for i in range(len(self.generator_layers)):
             self.generator_trainable_variables.extend(self.generator_layers[i].trainable_variables)
 
@@ -70,7 +71,6 @@ class BGN(tf.keras.models.Model):
         x_real, z_with_label = data
         z, _ = tf.split(z_with_label, [self.latent_dim, 1], axis=1)
         print(z.shape, x_real.shape)
-        z = tf.expand_dims(z, 1)
         x_fake = z
         for layer in self.generator_layers:
             x_fake = layer(x_fake)
@@ -164,8 +164,8 @@ if __name__ == '__main__':
 
 
     model.fit(
-        tr_data_std, np.hstack([np.random.uniform((data['tr'][0].shape[0], latent_dim)), data['tr'][1]]),
-        validation_data=(val_data_std, np.hstack([np.random.uniform((data['val'][0].shape[0], latent_dim)), data['val'][1]])),
+        tr_data_std, np.hstack([np.random.uniform(0, 1, (data['tr'][0].shape[0], latent_dim)), data['tr'][1].reshape(-1, 1)]),
+        validation_data=(val_data_std, np.hstack([np.random.uniform(0, 1, (data['val'][0].shape[0], latent_dim)), data['val'][1].reshape(-1, 1)])),
         epochs=10000,
         batch_size=512,
         callbacks=[
