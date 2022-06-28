@@ -193,7 +193,7 @@ if __name__ == '__main__':
     alpha = 3
     thr = np.mean(p) + alpha * np.std(p)
     predictions = np.zeros(len(data['inf'][1]))
-    y_pred = np.clip(model.predict(inf_data_std), 0, 1)
+    y_pred = np.clip(model.predict(inf_data_std), 0, np.inf)
     print(y_pred, thr, np.mean(p), np.std(p), np.min(p), np.max(p), np.min(y_pred), np.max(y_pred))
     predictions[np.where(y_pred > thr)[0]] = 1
     acc = len(np.where(predictions == data['inf'][1])[0]) / data['inf'][1].shape[0]
