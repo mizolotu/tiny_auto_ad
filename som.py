@@ -178,7 +178,7 @@ if __name__ == '__main__':
     model.fit(
         tr_data_std, data['tr'][1],
         validation_data=(val_data_std, data['val'][1]),
-        epochs=1,
+        epochs=10000,
         batch_size=512,
         callbacks=[
             tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=100, mode='min', restore_best_weights=True)
@@ -186,8 +186,6 @@ if __name__ == '__main__':
     )
 
     model.summary()
-    P = model.predict(data['val'][0])
-    print(P)
     p = np.clip(model.predict(data['val'][0]), 0, np.inf)
     alpha = 3
     thr = np.mean(p) + alpha * np.std(p)
