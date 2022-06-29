@@ -132,7 +132,7 @@ def fft(X, xmin=-32768, xmax=32767):
     X = np.clip(X, xmin, xmax)
     #E = [fix_fft(x) for x in X]
     E = [interval_fix_fft(x) for x in X]
-    print(E.shape)
+    print(E)
     return np.stack(E)
 
 
