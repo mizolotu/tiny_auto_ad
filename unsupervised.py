@@ -784,7 +784,7 @@ if __name__ == '__main__':
     parser.add_argument('-a', '--algorithms', help='Algorithms', default=['Kmeans'], nargs='+', choices=[i for i in hyperparams.keys()])
     parser.add_argument('-t', '--tries', help='Number of tries', default=1, type=int)
     parser.add_argument('-m', '--metric', help='Metric', default='em', choices=['em', 'mv'])
-    parser.add_argument('-f', '--feature_extractors', help='Feature extractors', nargs='+', default=['fft', 'freq1'])
+    parser.add_argument('-f', '--feature_extractors', help='Feature extractors', nargs='+', default=['fft', 'pam'])
     parser.add_argument('-n', '--n_samples', help='Number of samples', default=None, type=int)
     parser.add_argument('-s', '--seed', help='Seed', default=0, type=int)
     parser.add_argument('-p', '--plot', help='Plot?', type=bool)
