@@ -2,6 +2,7 @@ import mat73, json, scipy.io, os
 import os.path as osp
 import pandas as pd
 import numpy as np
+import tensorflow as tf
 
 from ctypes import cdll, c_short, POINTER
 
@@ -85,6 +86,25 @@ def pam(X):
     ])
     return E
 
+def interval_fix_fft(x, step=16, m=4, n_fft_features=8, fpath='libraries/fix_fft_32k_dll/fix_fft_32k.so'):
+    ff = cdll.LoadLibrary(fpath)
+    ff.fix_fft.argtypes = [POINTER(c_short), POINTER(c_short), c_short, c_short]
+    nsteps = len(x) // step
+    w = tf.cast(x, tf.int32)
+    intervals = np.split(w, nsteps)
+    def fix_fft(re):
+        s = np.zeros((n_fft_features, re.shape[1]))
+        for j in range(re.shape[1]):
+            im = [0 for _ in range(step)]
+            re_c = (c_short * step)(*re[:, j])
+            im_c = (c_short * step)(*im)
+            ff.fix_fft(re_c, im_c, c_short(m), c_short(0))
+            for i in range(n_fft_features):
+                s[i, j] = np.round(np.sqrt(re_c[i] * re_c[i] + im_c[i] * im_c[i]) // 2)
+        return s
+    mgn = map(fix_fft, intervals)
+    return np.vstack(mgn)
+
 def fix_fft(x, m=5, n_fft_features=16, fpath='libraries/fix_fft_32k_dll/fix_fft_32k.so'):
     ff = cdll.LoadLibrary(fpath)
     ff.fix_fft.argtypes = [POINTER(c_short), POINTER(c_short), c_short, c_short]
@@ -110,7 +130,9 @@ def fft(X, xmin=-32768, xmax=32767):
     X = X * (xmax - xmin) + xmin
     X = np.round(X)
     X = np.clip(X, xmin, xmax)
-    E = [fix_fft(x) for x in X]
+    #E = [fix_fft(x) for x in X]
+    E = [interval_fix_fft(x) for x in X]
+    print(E.shape)
     return np.stack(E)
 
 
