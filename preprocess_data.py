@@ -86,6 +86,10 @@ def pam(X):
     ])
     return E
 
+def freq1(X):
+    assert len(X.shape) == 3
+    return np.vstack([x[0, :] for x in X])
+
 def interval_fix_fft(x, step=16, m=4, n_fft_features=8, fpath='libraries/fix_fft_32k_dll/fix_fft_32k.so'):
     ff = cdll.LoadLibrary(fpath)
     ff.fix_fft.argtypes = [POINTER(c_short), POINTER(c_short), c_short, c_short]
@@ -122,7 +126,7 @@ def fix_fft(x, m=5, n_fft_features=16, fpath='libraries/fix_fft_32k_dll/fix_fft_
     mgn = map(fft, x)
     return np.transpose(np.vstack(mgn))
 
-def fft(X, xmin=-32768, xmax=32767):
+def fft(X, xmin=-8192, xmax=8192):
     assert len(X.shape) == 3
     x_min = np.min(X)
     x_max = np.max(X)
@@ -130,9 +134,8 @@ def fft(X, xmin=-32768, xmax=32767):
     X = X * (xmax - xmin) + xmin
     X = np.round(X)
     X = np.clip(X, xmin, xmax)
-    #E = [fix_fft(x) for x in X]
-    E = [interval_fix_fft(x) for x in X]
-    print(E)
+    E = [fix_fft(x) for x in X]
+    print(E[0:100])
     return np.stack(E)
 
 
