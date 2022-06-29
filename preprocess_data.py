@@ -90,7 +90,7 @@ def freq1(X):
     assert len(X.shape) == 3
     return np.vstack([x[0, :] for x in X])
 
-def interval_fix_fft(x, step=8, m=4, n_fft_features=16, fpath='libraries/fix_fft_32k_dll/fix_fft_32k.so'):
+def interval_fix_fft(x, step=16, m=4, n_fft_features=16, fpath='libraries/fix_fft_32k_dll/fix_fft_32k.so'):
     ff = cdll.LoadLibrary(fpath)
     ff.fix_fft.argtypes = [POINTER(c_short), POINTER(c_short), c_short, c_short]
     nsteps = len(x) // step
