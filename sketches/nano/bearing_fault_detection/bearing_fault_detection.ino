@@ -23,10 +23,10 @@
 
 class Queue {
   float (*arr)[BUFFER_DIM];     // array to store queue elements
-  int capacity;                 // maximum capacity of the queue
-  int front;                    // front points to the front element in the queue (if any)
-  int rear;                     // rear points to the last element in the queue
-  int count;                    // current size of the queue
+  short capacity;                 // maximum capacity of the queue
+  short front;                    // front points to the front element in the queue (if any)
+  short rear;                     // rear points to the last element in the queue
+  short count;                    // current size of the queue
   float arr_sum;
   float arr_ssum;
 
@@ -40,7 +40,7 @@ public:
   ~Queue();                            // destructor
 
   void enqueue(float x[BUFFER_DIM]);
-  int size();
+  short size();
   bool isEmpty();
   bool isFull();
   float* mean();
@@ -79,7 +79,7 @@ void Queue::enqueue(float x[BUFFER_DIM]) {
   count++;
 }
 
-int Queue::size() {
+short Queue::size() {
   return count;
 }
 
@@ -89,6 +89,14 @@ bool Queue::isEmpty() {
 
 bool Queue::isFull() {
   return (size() == capacity);
+}
+
+float* Queue::get(short i) {
+  static float x[DIM];
+  for (short j = 0; j < DIM; j++) {
+    x[j] = arr[(i + front) % capacity][j];
+  }
+  return x;
 }
 
 float* Queue::mean() {
