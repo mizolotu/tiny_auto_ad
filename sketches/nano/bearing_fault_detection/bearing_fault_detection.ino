@@ -8,12 +8,11 @@
 #define FFT_SIZE             1     // number of buffers per fft
 #define FFT_N                5     // fft n
 #define FFT_STEP             8     // fft step
-#define FFT_FEATURES         4     // fft step
+#define FFT_FEATURES         4     // fft features
 #define XYZ_SCALE         8192     // XYZ scale 32767 / 4g (not sure if this is correct though)
 #define BASELINE_STEPS    1000     // number of iteration to define the baseline
 #define BASELINE_ALPHA       3     // baseline number of stds
 #define INFERENCE_DELAY     10     // delay during the infrence and training
-#define BASELINE_DELAY_MP  100     // inference delay multiplier for the baseline recording
 #define BATCH_SIZE          32     // batch size
 
 #define SAMPLE_THRESHOLD  1000  // XYZ threshold to trigger sampling
@@ -127,9 +126,8 @@ short im[XYZ_BUFFER_SIZE];
 float freq[FFT_FEATURES * 3];
 float batch[BATCH_SIZE][FFT_FEATURES * 3];
 
-Queue base_q(BUFFER_SIZE);
 Queue xyz_q(BUFFER_SIZE);
-Queue fft_q(BUFFER_SIZE);
+Queue fft_q(BATCH_SIZE * );
 
 void setup() {
   
@@ -143,7 +141,7 @@ void setup() {
 
   Serial.println("Recoding baseline!");
 
-  for (unsigned short i=0; i<BUFFER_SIZE; i++) {
+  for (unsigned short i=0; i<BUFFER_SIZE * BATCH_SIZE; i++) {
   
     // get new xyz data point
   
@@ -161,9 +159,12 @@ void setup() {
        
     base_q.enqueue(x);
 
-    delay(BASELINE_DELAY_MP * INFERENCE_DELAY);
+    delay(INFERENCE_DELAY);
     
   }
+
+  
+  
 }
 
 
