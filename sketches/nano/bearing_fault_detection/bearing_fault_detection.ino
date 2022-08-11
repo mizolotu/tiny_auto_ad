@@ -1,9 +1,9 @@
 #include <fix_fft_32k.h>
 #include <math.h>
 #include <Arduino_LSM9DS1.h>
+#include "StaticDimensionQueue.h"
 
-
-#define BUFFER_SIZE         32     // buffer size for accelerometer data
+#define BUFFER_SIZE       1024     // buffer size for accelerometer data
 #define BUFFER_DIM           3     // buffer size for accelerometer data
 #define FFT_SIZE             1     // number of buffers per fft
 #define FFT_N                5     // fft n
@@ -20,97 +20,6 @@
 #define TOTAL_COUNT_MAX   20000 // total number of voice instance
 #define SCORE_THRESHOLD   0.5   // score threshold 
 
-
-class Queue {
-  float (*arr)[BUFFER_DIM];     // array to store queue elements
-  short capacity;                 // maximum capacity of the queue
-  short front;                    // front points to the front element in the queue (if any)
-  short rear;                     // rear points to the last element in the queue
-  short count;                    // current size of the queue
-  float arr_sum;
-  float arr_ssum;
-
-private:
-
-  void dequeue();
-
-public:
-
-  Queue(short size = BUFFER_SIZE);     // constructor
-  ~Queue();                            // destructor
-
-  void enqueue(float x[BUFFER_DIM]);
-  short size();
-  bool isEmpty();
-  bool isFull();
-  float* mean();
-  
-};
-
-Queue::Queue(short size) {
-  arr = new float[size][BUFFER_DIM];
-  capacity = size;
-  front = 0;
-  rear = -1;
-  count = 0;
-}
-
-Queue::~Queue() {
-  delete[] arr;
-}
-
-void Queue::dequeue() {
-  front = (front + 1) % capacity;
-  count--;
-}
-
-void Queue::enqueue(float x[BUFFER_DIM]) { 
-    
-  if (isFull()) {
-    dequeue();
-  }
-
-  rear = (rear + 1) % capacity;
-
-  for (short i=0; i < BUFFER_DIM; i++) {
-    arr[rear][i] = x[i];
-  }
-
-  count++;
-}
-
-short Queue::size() {
-  return count;
-}
-
-bool Queue::isEmpty() {
-  return (size() == 0);
-}
-
-bool Queue::isFull() {
-  return (size() == capacity);
-}
-
-float* Queue::get(short i) {
-  static float x[DIM];
-  for (short j = 0; j < DIM; j++) {
-    x[j] = arr[(i + front) % capacity][j];
-  }
-  return x;
-}
-
-float* Queue::mean() {
-  static float m[BUFFER_DIM];
-  for (short j = 0; j < BUFFER_DIM; j++) {
-    for (short i = 0; i < capacity; i++) {
-      m[j] += arr[i][j];
-    }
-    m[j] /= capacity;
-  }
-  return m;
-}
-
-
 unsigned int stage = 0;
 
 // Stages:
@@ -118,24 +27,32 @@ unsigned int stage = 0;
 // 1 - training deep SVDD
 // 2 - inference
 
-unsigned int buffer_count = 0;
+unsigned int fft_count = 0;
 unsigned int sample_count = 0;
 unsigned int total_count = 0;
 unsigned int window_count = 0;
 
 float x[BUFFER_DIM];
+StaticDimensionQueue xyz_q(BUFFER_SIZE);
+StaticDimensionQueue fft_q(BATCH_SIZE * FFT_FEATURES);
+
+float* ptr;
+float x_mean[BUFFER_DIM];
+float x_std[BUFFER_DIM];
+float x_std_thr[BUFFER_DIM];
+
+bool is_active;
+
 float x_min, y_min, z_min;
 float x_max, y_max, z_max;
-float x_mean, y_mean, z_mean;
-float x_std, y_std, z_std;
 
-short re[XYZ_BUFFER_SIZE];
-short im[XYZ_BUFFER_SIZE];
+
+short re[BUFFER_SIZE];
+short im[BUFFER_SIZE];
 float freq[FFT_FEATURES * 3];
 float batch[BATCH_SIZE][FFT_FEATURES * 3];
 
-Queue xyz_q(BUFFER_SIZE);
-Queue fft_q(BATCH_SIZE * );
+
 
 void setup() {
   
@@ -147,9 +64,9 @@ void setup() {
     while (1);
   }
 
-  Serial.println("Recoding baseline!");
-
-  for (unsigned short i=0; i<BUFFER_SIZE * BATCH_SIZE; i++) {
+  Serial.println("Recoding baseline... DO NOT MOVE THE DEVICE!");
+  
+  for (unsigned short i=0; i<BUFFER_SIZE; i++) {
   
     // get new xyz data point
   
@@ -165,19 +82,30 @@ void setup() {
 
     // add the new point to the baseline queue
        
-    base_q.enqueue(x);
+    xyz_q.enqueue(x);
 
     delay(INFERENCE_DELAY);
     
   }
 
-  
-  
+  ptr = xyz_q.std();
+  for (unsigned short j=0; j<BUFFER_DIM; j++) {
+    x_std_thr[j] = *(ptr + j);
+  }
+
+  Serial.println("Training the model... DO NOT MOVE THE DEVICE!");
+
 }
 
 
 void loop() {
 
+  // calculate mean
+
+  ptr = xyz_q.mean();
+  for (unsigned short j=0; j<BUFFER_DIM; j++) {
+    x_mean[j] = *(ptr + j);
+  }
   
   // get new xyz data point
   
@@ -185,15 +113,97 @@ void loop() {
     IMU.readAcceleration(x[0], x[1], x[2]);
   }
 
+  // scale the point
+
   for (unsigned short i=0; i<BUFFER_DIM; i++) {
     x[i] *= XYZ_SCALE;
   }
 
-  if (sample_count % BUFFER_SIZE == 0) {
-    base_q.enqueue(x);  
-  }
-   
+  // enque the point
+
+  xyz_q.enqueue(x);
+ 
   if (stage == 0) {
+
+    // check if there is activity
+
+    is_active = false;
+
+    for (unsigned short i=0; i<BUFFER_DIM; i++) {
+      if (abs(x[i] - x_mean[i]) > BASELINE_ALPHA * x_std_thr[i]) {
+        is_active = true;
+        Serial.println(abs(x[i] - x_mean[i]));
+        Serial.println(BASELINE_ALPHA * x_std_thr[i]);
+        break;
+      }      
+    }
+
+    if (is_active) {
+      window_count = FFT_FEATURES;
+    }
+
+    //Serial.println(window_count);
+
+    // check that there is enough samples to compute fft
+
+    if (fft_count >= FFT_STEP) {
+
+      // check that more fft features are required
+
+      if (window_count > 0) {
+
+        float freq[BUFFER_DIM];
+
+        for (unsigned short j = 0; j < 3; j++) {
+
+          for (unsigned short i = 0; i < FFT_STEP * FFT_FEATURES; i++) {
+            re[i] = *(xyz_q.get(xyz_q.size() - FFT_STEP * FFT_FEATURES + i) + j);
+            im[i] = 0;
+          }
+
+          fix_fft(re, im, FFT_N, 0);
+
+          freq[j] = sqrt(re[0] * re[0] + im[0] * im[0]) / 2;
+
+        }
+
+        fft_q.enqueue(freq); // only the first frequency is used
+
+        Serial.println(fft_q.size());
+        Serial.println("");
+
+        for (unsigned short i = 0; i < FFT_FEATURES; i++) {
+          for (unsigned short j = 0; j < 3; j++) {
+            Serial.print(*(fft_q.get(fft_q.size() - FFT_FEATURES + i) + j));
+            Serial.print(",");
+          }
+          Serial.println("");
+        }
+    
+        Serial.println("");
+    
+        window_count -= 1;    
+
+        //Serial.println("here!");
+        //while (1);
+    
+      }
+      
+      fft_count = 0;
+
+    }
+
+    if (fft_q.isFull()) {
+      Serial.println("here!");
+
+
+      
+      stage = 1;
+    }
+
+    //
+
+    /*
 
     x_mean += x[0];
     y_mean += x[1];
@@ -245,11 +255,14 @@ void loop() {
       }
 
       stage = 1;
-      
+
     }
 
+    */
     
   } else if (stage == 1) {
+
+    /*
 
     for (unsigned short i = 0; i < XYZ_BUFFER_SIZE - 1; i++) {
       for (unsigned short j = 0; j < 3; j++) {
@@ -264,6 +277,7 @@ void loop() {
     xyz[BUFFER_SIZE - 1][0] = int(x);
     xyz[BUFFER_SIZE - 1][1] = int(y);
     xyz[BUFFER_SIZE - 1][2] = int(z);
+    
 
     if (buffer_count >= FFT_STEP) {
 
@@ -307,12 +321,15 @@ void loop() {
       //while (1);
       buffer_count = 0;
 
-    }   
+    } 
+
+    */
+    
   }
 
-  buffer_count += 1;
+  fft_count += 1;
   sample_count += 1;
   
-  delay(DELAY);
-    
+  delay(INFERENCE_DELAY);
+
 }
