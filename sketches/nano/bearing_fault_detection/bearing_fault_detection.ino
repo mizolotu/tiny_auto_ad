@@ -1,7 +1,7 @@
 #include <fix_fft_32k.h>
 #include <math.h>
 #include <Arduino_LSM9DS1.h>
-#include "StaticDimensionQueue.h"
+#include "DynamicDimensionQueue.h"
 
 #define BUFFER_SIZE       1024     // buffer size for accelerometer data
 #define BUFFER_DIM           3     // buffer size for accelerometer data
@@ -14,6 +14,7 @@
 #define BASELINE_ALPHA       3     // baseline number of stds
 #define INFERENCE_DELAY     10     // delay during the infrence and training
 #define BATCH_SIZE          32     // batch size
+#define DEBUG               false  // debug
 
 #define SAMPLE_THRESHOLD  1000  // XYZ threshold to trigger sampling
 #define FEATURE_SIZE      1     // sampling size of one voice instance
@@ -32,39 +33,34 @@ unsigned int sample_count = 0;
 unsigned int total_count = 0;
 unsigned int window_count = 0;
 
-float x[BUFFER_DIM];
-StaticDimensionQueue xyz_q(BUFFER_SIZE);
-StaticDimensionQueue fft_q(BATCH_SIZE * FFT_FEATURES);
+DynamicDimensionQueue xyz_q(BUFFER_SIZE, BUFFER_DIM);
+DynamicDimensionQueue fft_q(BATCH_SIZE, FFT_FEATURES * BUFFER_DIM);
 
-float* ptr;
+float x[BUFFER_DIM];
 float x_mean[BUFFER_DIM];
 float x_std[BUFFER_DIM];
 float x_std_thr[BUFFER_DIM];
 
 bool is_active;
 
-float x_min, y_min, z_min;
-float x_max, y_max, z_max;
-
-
 short re[BUFFER_SIZE];
 short im[BUFFER_SIZE];
-float freq[FFT_FEATURES * 3];
-float batch[BATCH_SIZE][FFT_FEATURES * 3];
+float freq[FFT_FEATURES * BUFFER_DIM];
 
-
+int idx;
+int window_start = 0;
 
 void setup() {
   
   Serial.begin(115200);
   while (!Serial);
-  
+
   if (!IMU.begin()) {
     Serial.println("Failed to initialize IMU!");
     while (1);
   }
 
-  Serial.println("Recoding baseline... DO NOT MOVE THE DEVICE!");
+  Serial.println("Recoding the baseline... THE MOTOR SHOULD BE OFF!");
   
   for (unsigned short i=0; i<BUFFER_SIZE; i++) {
   
@@ -84,16 +80,15 @@ void setup() {
        
     xyz_q.enqueue(x);
 
-    delay(INFERENCE_DELAY);
+    total_count += 1;
+
+    delay(INFERENCE_DELAY);    
     
   }
 
-  ptr = xyz_q.std();
-  for (unsigned short j=0; j<BUFFER_DIM; j++) {
-    x_std_thr[j] = *(ptr + j);
-  }
-
-  Serial.println("Training the model... DO NOT MOVE THE DEVICE!");
+  xyz_q.std(x_std_thr);
+  
+  Serial.println("Training the model... DO NOT MOVE THE BOARD!");
 
 }
 
@@ -102,10 +97,7 @@ void loop() {
 
   // calculate mean
 
-  ptr = xyz_q.mean();
-  for (unsigned short j=0; j<BUFFER_DIM; j++) {
-    x_mean[j] = *(ptr + j);
-  }
+  xyz_q.mean(x_mean);
   
   // get new xyz data point
   
@@ -132,8 +124,6 @@ void loop() {
     for (unsigned short i=0; i<BUFFER_DIM; i++) {
       if (abs(x[i] - x_mean[i]) > BASELINE_ALPHA * x_std_thr[i]) {
         is_active = true;
-        Serial.println(abs(x[i] - x_mean[i]));
-        Serial.println(BASELINE_ALPHA * x_std_thr[i]);
         break;
       }      
     }
@@ -142,7 +132,12 @@ void loop() {
       window_count = FFT_FEATURES;
     }
 
-    //Serial.println(window_count);
+    if (DEBUG) {
+      Serial.print(fft_count);
+      Serial.print(", ");
+      Serial.print(window_count);
+      Serial.println();
+    }
 
     // check that there is enough samples to compute fft
 
@@ -152,41 +147,54 @@ void loop() {
 
       if (window_count > 0) {
 
-        float freq[BUFFER_DIM];
+        for (unsigned short j = 0; j < BUFFER_DIM; j++) {
 
-        for (unsigned short j = 0; j < 3; j++) {
-
-          for (unsigned short i = 0; i < FFT_STEP * FFT_FEATURES; i++) {
-            re[i] = *(xyz_q.get(xyz_q.size() - FFT_STEP * FFT_FEATURES + i) + j);
+          for (unsigned short i = 0; i < FFT_STEP; i++) {
+            xyz_q.get(xyz_q.size() - FFT_STEP + i, x);
+            re[i] = x[j];
             im[i] = 0;
           }
-
+          
           fix_fft(re, im, FFT_N, 0);
 
-          freq[j] = sqrt(re[0] * re[0] + im[0] * im[0]) / 2;
-
+          idx = min(FFT_FEATURES - 1, window_start);
+          
+          if (window_start > FFT_FEATURES - 1) {
+            for (unsigned short i = 0; i < FFT_FEATURES - 1; i++) {
+              freq[i * BUFFER_DIM + j] = freq[(i + 1) * BUFFER_DIM + j];
+            }
+          } 
+          
+          freq[idx * BUFFER_DIM + j] = sqrt(re[0] * re[0] + im[0] * im[0]) / 2; // only the first frequency is used
+          
         }
 
-        fft_q.enqueue(freq); // only the first frequency is used
+        if (window_start >= FFT_FEATURES - 1) {
+          
+          fft_q.enqueue(freq);
 
-        Serial.println(fft_q.size());
-        Serial.println("");
+          Serial.println(fft_q.size());
+          Serial.println(window_start);
+          Serial.println("");
 
-        for (unsigned short i = 0; i < FFT_FEATURES; i++) {
-          for (unsigned short j = 0; j < 3; j++) {
-            Serial.print(*(fft_q.get(fft_q.size() - FFT_FEATURES + i) + j));
+          fft_q.get(fft_q.size() - 1, freq);
+          for (unsigned short j = 0; j < FFT_FEATURES * BUFFER_DIM; j++) {
+            Serial.print(freq[j]);
             Serial.print(",");
           }
           Serial.println("");
+          Serial.println("");
+          
         }
-    
-        Serial.println("");
-    
-        window_count -= 1;    
+
+        window_count -= 1;
+        window_start += 1; 
 
         //Serial.println("here!");
         //while (1);
     
+      } else {
+        window_start = 0;
       }
       
       fft_count = 0;
@@ -197,7 +205,6 @@ void loop() {
       Serial.println("here!");
 
 
-      
       stage = 1;
     }
 
@@ -328,7 +335,11 @@ void loop() {
   }
 
   fft_count += 1;
-  sample_count += 1;
+  //sample_count += 1;
+
+  total_count += 1;
+  //Serial.println(total_count);
+  //Serial.println();
   
   delay(INFERENCE_DELAY);
 

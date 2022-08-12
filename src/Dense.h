@@ -10,14 +10,15 @@
 
 class Dense {
 
-	int input_dim;
-	int n_units;
+	short input_dim;
+	short n_units;
+	float *weights;
 
 	private:
 
 	public:
 
-    	Dense();
+		Dense(short input_dim, short n_units);
     	virtual ~Dense();
 
     	float* forward(float *x);
