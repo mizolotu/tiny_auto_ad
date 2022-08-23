@@ -7,9 +7,13 @@
 //============================================================================
 
 #include <iostream>
+
 #include "Dense.h"
 #include "DynamicDimensionQueue.h"
 #include "StaticDimensionQueue.h"
+#include "Svd.h"
+#include "utils.h"
+
 #include <math.h>
 #include <unistd.h>
 
@@ -120,15 +124,82 @@ void testDynamicDimensionQueue() {
 
 }
 
-void testDense() {
-	cout << (random() % 1000) / 1000.0 << endl << endl;
+void testSvd() {
+
+	float x[3] = {1, 2, 3};
+	float y0[4], y1[2], z[2];
+	float* y;
+
+	Dense dense0 = Dense(3, 4, &relu);
+
+	Dense dense1 = Dense(4, 2, &relu);
+
+	dense0.forward(x);
+	y = dense0.get_output();
+	for (short k=0; k<4; k++) {
+		y0[k] = *(y + k);
+	}
+
+	cout << "Dense 0:" << endl;
+	for (short k=0; k<4; k++) {
+		cout << y0[k] << ", ";
+	}
+	cout << endl;
+
+	dense1.forward(y0);
+	y = dense1.get_output();
+	for (short k=0; k<4; k++) {
+		y1[k] = *(y + k);
+	}
+
+	cout << "Dense 1:" << endl;
+	for (short k=0; k<2; k++) {
+		cout << y1[k] << ", ";
+	}
+	cout << endl;
+
+	Dense layers[2] = {
+		Dense(3, 4, &relu),
+		Dense(4, 2, &relu)
+	};
+
+	Svd svd = Svd(2, layers);
+
+	for (int iter=0; iter<10; iter++) {
+		cout << "Iteration " << iter << ":" << endl;
+
+		x[0] += 1;
+		x[1] += 1;
+		x[2] += 1;
+
+		svd.forward(x);
+
+		y = svd.get_output();
+
+		for (short k=0; k<2; k++) {
+			z[k] = *(y + k);
+		}
+
+		cout << "SVD last dense layer output:" << endl;
+		for (short k=0; k<2; k++) {
+			cout << z[k] << ", ";
+		}
+		cout << endl;
+
+	}
+
+	svd.fix_c();
+
+
+
+
 }
 
 int main() {
 
 	//testStaticDimensionQueue();
-	testDynamicDimensionQueue();
-	//testDense();
+	//testDynamicDimensionQueue();
+	testSvd();
 
 	return 0;
 }
