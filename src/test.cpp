@@ -11,11 +11,11 @@
 #include "Dense.h"
 #include "DynamicDimensionQueue.h"
 #include "StaticDimensionQueue.h"
-#include "Svd.h"
 #include "utils.h"
 
 #include <math.h>
 #include <unistd.h>
+#include "Svdd.h"
 
 #define SIZE 5
 #define DIM  3
@@ -126,16 +126,22 @@ void testDynamicDimensionQueue() {
 
 void testSvd() {
 
-	float x[3] = {1, 2, 3};
+	float x[32][3];
+	for (short i=0; i<32; i++) {
+		for (short j=0; j<3; j++) {
+			x[i][j] = (random() % 1000);
+		}
+	}
 	float y0[4], y1[2], z[2];
 	float* y;
 
-	Dense dense0 = Dense(3, 4, &relu);
+	Dense dense0 = Dense(3, 4, &relu, &d_relu);
 
-	Dense dense1 = Dense(4, 2, &relu);
+	Dense dense1 = Dense(4, 2, &sigmoid, &d_sigmoid);
 
-	dense0.forward(x);
-	y = dense0.get_output();
+	dense0.forward(x[0]);
+
+	y = dense0.get_outputs();
 	for (short k=0; k<4; k++) {
 		y0[k] = *(y + k);
 	}
@@ -147,7 +153,7 @@ void testSvd() {
 	cout << endl;
 
 	dense1.forward(y0);
-	y = dense1.get_output();
+	y = dense1.get_outputs();
 	for (short k=0; k<4; k++) {
 		y1[k] = *(y + k);
 	}
@@ -159,39 +165,38 @@ void testSvd() {
 	cout << endl;
 
 	Dense layers[2] = {
-		Dense(3, 4, &relu),
-		Dense(4, 2, &relu)
+		Dense(3, 4, &relu, &d_relu),
+		Dense(4, 2, &sigmoid, &d_sigmoid)
 	};
 
-	Svd svd = Svd(2, layers);
+	Svdd svd = Svdd(2, layers, 0.01);
 
-	for (int iter=0; iter<10; iter++) {
-		cout << "Iteration " << iter << ":" << endl;
-
-		x[0] += 1;
-		x[1] += 1;
-		x[2] += 1;
-
-		svd.forward(x);
-
-		y = svd.get_output();
-
-		for (short k=0; k<2; k++) {
-			z[k] = *(y + k);
-		}
-
-		cout << "SVD last dense layer output:" << endl;
-		for (short k=0; k<2; k++) {
-			cout << z[k] << ", ";
-		}
-		cout << endl;
-
+	for (int iter=0; iter<32; iter++) {
+		svd.forward(x[iter]);
 	}
 
 	svd.fix_c();
 
+	float loss;
+	for(int epoch=0; epoch < 10000; epoch ++) {
 
+		loss = 0;
 
+		for (int iter=0; iter<32; iter++) {
+
+			svd.forward(x[iter]);
+
+			loss += 0.5 * svd.get_score();
+
+			svd.backward(x[iter]);
+
+		}
+
+		cout << "After epoch " << epoch << " loss = " << loss / 32 << endl;
+
+		usleep(1000);
+
+	}
 
 }
 
