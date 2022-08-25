@@ -697,7 +697,8 @@ class DeepSvdd(DeepAnomalyDetector):
         super(DeepSvdd, self).__init__()
 
     def _calculate_distances(self, data, eps=1e-10):
-        p = np.clip(self.model.predict(data[0]), 0, np.inf)
+        preds = self.model.predict(data[0])
+        p = np.clip(preds, 0, np.inf)
         self.radiuses = np.array([np.mean(p), np.std(p), np.max(p)]).reshape(1, -1)
 
     def predict(self, data, alpha, eps=1e-10):
@@ -708,7 +709,7 @@ class DeepSvdd(DeepAnomalyDetector):
         pred_thrs = radiuses[0]
         predictions = np.zeros(nte)
         predictions[np.where(dists_te > pred_thrs)[0]] = 1
-        scores = (pred_thrs - dists_te) / (pred_thrs + 1e-10)
+        scores = (pred_thrs - dists_te) / (pred_thrs + eps)
         return predictions, scores
 
     def _set_radiuses(self, data, metric='em', alpha=3, n_generated=100000):
@@ -724,14 +725,18 @@ class DeepSvdd(DeepAnomalyDetector):
         metric_val = metric_fun(volume_support, s_U, s_X, n_generated)[0]
         return alpha, metric_val
 
-    def fit(self, data, validation_data, hp, metric='em', encoder_units=[64, 32, 16], epochs=10000, batch_size=512, lr=1e-3, patience=100, eps=1e-10):
+    def fit(self, data, validation_data, hp, metric='em', std=False, encoder_units=[64, 32, 16], epochs=10000, batch_size=512, lr=1e-3, patience=100, eps=1e-10):
 
         self.xmin = np.min(data[0], 0)
         self.xmax = np.max(data[0], 0)
 
         inp_shape = data[0].shape[1:]
         inputs = tf.keras.layers.Input(shape=inp_shape)
-        hidden = (inputs - np.mean(data[0], 0)[None, :]) / (np.std(data[0], 0)[None, :] + 1e-10)
+
+        if std:
+            hidden = (inputs - np.mean(data[0], 0)[None, :]) / (np.std(data[0], 0)[None, :] + eps)
+        else:
+            hidden = inputs
 
         for units in encoder_units[:-1]:
             hidden = tf.keras.layers.Dense(units=units)(hidden)
@@ -752,7 +757,7 @@ class DeepSvdd(DeepAnomalyDetector):
             callbacks=[
                 tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=patience, mode='min', restore_best_weights=True)
             ],
-            verbose=False
+            verbose=True
         )
 
         self._calculate_distances(validation_data)
@@ -781,11 +786,11 @@ if __name__ == '__main__':
 
     parser = arp.ArgumentParser(description='Test AD methods.')
     parser.add_argument('-d', '--dataset', help='Dataset name', default='bearing', choices=['fan', 'bearing'])
-    parser.add_argument('-a', '--algorithms', help='Algorithms', default=['Kmeans'], nargs='+', choices=[i for i in hyperparams.keys()])
-    parser.add_argument('-t', '--tries', help='Number of tries', default=1, type=int)
+    parser.add_argument('-a', '--algorithms', help='Algorithms', default=['DeepSvdd'], nargs='+', choices=[i for i in hyperparams.keys()])
+    parser.add_argument('-t', '--tries', help='Number of tries', default=3, type=int)
     parser.add_argument('-m', '--metric', help='Metric', default='em', choices=['em', 'mv'])
-    parser.add_argument('-f', '--feature_extractors', help='Feature extractors', nargs='+', default=['fft', 'flat'])
-    parser.add_argument('-n', '--n_samples', help='Number of samples', default=None, type=int)
+    parser.add_argument('-f', '--feature_extractors', help='Feature extractors', nargs='+', default=['fft', 'pam'])
+    parser.add_argument('-n', '--n_samples', help='Number of samples', default=1000, type=int)
     parser.add_argument('-s', '--seed', help='Seed', default=0, type=int)
     parser.add_argument('-p', '--plot', help='Plot?', type=bool)
     parser.add_argument('-g', '--gpu', help='GPU', default='-1')
@@ -801,12 +806,13 @@ if __name__ == '__main__':
     dataset = args.dataset
     if dataset == 'fan':
         labels = {0: ['normal', 'on_off'], 1: ['stick', 'tape', 'shake']}
-    elif dataset == 'bearing':
+    elif dataset == 'bearing' or dataset == 'bearing_fft_std':
         labels = {0: ['normal'], 1: ['crack', 'sand']}
 
     data_fpath = osp.join(DATA_DIR, dataset)
     target_dataset = load_dataset(data_fpath, series_len=32, series_step=1, labels=labels, feature_extractors=args.feature_extractors, n_samples=args.n_samples)
     data = split_data(target_dataset, shuffle_features=False)
+    print(data['tr'][0].shape)
 
     n_tries = args.tries
 
@@ -818,7 +824,8 @@ if __name__ == '__main__':
         for hp in hyperparams[method]:
             acc_sum, fpr_sum, tpr_sum, metric_sum = 0, 0, 0, 0
             for j in range(n_tries):
-                alpha, metric_val = m.fit(data['tr'], validation_data=data['val'], hp=hp, metric=args.metric)
+                alpha, metric_val = m.fit(data['tr'], validation_data=data['val'], hp=hp, metric=args.metric, batch_size=1, epochs=100, lr=0.001)
+                print(m.radiuses)
                 acc, fpr, tpr = m.evaluate(data['inf'], alpha)
                 acc_sum += acc
                 fpr_sum += fpr
