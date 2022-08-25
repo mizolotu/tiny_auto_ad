@@ -78,10 +78,10 @@ def pam(X):
     I[np.triu_indices(m)] = 0
     E = np.vstack([
         np.hstack([
-            np.min(x, 0),
+            #np.min(x, 0),
+            #np.max(x, 0),
             np.max(x, 0),
-            np.mean(x, 0),
-            np.std(x, 0),
+            #np.std(x, 0),
         ]) for x in X
     ])
     return E
@@ -139,8 +139,10 @@ def fft(X, xmin=-8192, xmax=8192):
     X = X * (xmax - xmin) + xmin
     X = np.round(X)
     X = np.clip(X, xmin, xmax)
-    #E = [fix_fft(x) for x in X]
-    E = [interval_fix_fft(x) for x in X]
+    X = [np.round(x - np.mean(x, 0)) for x in X]
+    E = [fix_fft(x) for x in X]
+    print(E[0])
+    #E = [interval_fix_fft(x) for x in X]
     return np.stack(E)
 
 

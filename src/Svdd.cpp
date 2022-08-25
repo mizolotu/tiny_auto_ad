@@ -17,7 +17,7 @@ using namespace std;
 
 #include <iostream>
 
-Svdd::Svdd(short n, Dense* l, float lr) {
+Svdd::Svdd(short n, Dense* l, float lr, short a) {
 	n_layers = n;
 	layers = l;
 	n_output = layers[n_layers - 1].get_output_dim();
@@ -25,11 +25,16 @@ Svdd::Svdd(short n, Dense* l, float lr) {
 	for (short i=0; i < n_output; i++) {
 		c[i] = 0.0;
 	}
-	score = 0.0;
 	is_c_fixed = false;
-	n_c = 0;
+	c_n = 0;
 	learning_rate = lr;
-
+	score = 0.0;
+	score_n = 0;
+	score_sum = 0.0;
+	score_ssum = 0.0;
+	score_thr = 0;
+	is_score_thr_fixed = true;
+	score_alpha = a;
 }
 
 Svdd::~Svdd() {}
@@ -40,7 +45,7 @@ short Svdd::get_output_dim() {
 
 void Svdd::fix_c() {
 	for (short i=0; i<n_output; i++) {
-		c[i] /= n_c;
+		c[i] /= c_n;
 		cout << "c[" << i << "] = " << c[i] << endl;
 	}
 	is_c_fixed = true;
@@ -54,6 +59,18 @@ float Svdd::get_score() {
 	return score;
 }
 
+void Svdd::switch_score_thr() {
+	cout << score_sum << endl;
+	cout << score_n << endl;
+	cout << score_ssum << endl;
+	score_thr = score_sum / score_n + score_alpha * sqrt((max(0.0, score_ssum - score_n * pow(score_sum / score_n, 2))) / score_n);
+	is_score_thr_fixed = !is_score_thr_fixed;
+}
+
+float Svdd::get_score_thr() {
+	return score_thr;
+}
+
 void Svdd::forward(float* x) {
 	float* layer_output;
 	layer_output = x;
@@ -61,17 +78,33 @@ void Svdd::forward(float* x) {
 		layers[i].forward(layer_output);
 		layer_output = layers[i].get_outputs();
 	}
-	if (is_c_fixed == true) {
+
+	if (is_c_fixed) {
+
 		score = 0;
 		for (short i=0; i<n_output; i++) {
 			score += pow(c[i] - layer_output[i], 2);
 		}
+
 	} else {
-		n_c += 1;
+
+		c_n += 1;
 		for (short i=0; i<n_output; i++) {
 			c[i] += layer_output[i];
 		}
+
 	}
+
+	if (is_score_thr_fixed) {
+
+	} else {
+
+		score_n += 1;
+		score_sum += score;
+		score_ssum += pow(score, 2);
+
+	}
+
 }
 
 void Svdd::backward(float* x) {

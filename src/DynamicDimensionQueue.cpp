@@ -80,26 +80,21 @@ bool DynamicDimensionQueue::isFull() {
     return (size() == capacity);
 }
 
-float* DynamicDimensionQueue::mean() {
-	float *m = new float[dimension];
+void DynamicDimensionQueue::xmax(float* m) {
 	for (short i = 0; i < dimension; i++) {
-		m[i] = sum[i] / count;
+		m[i] = -99999999.0;
+		for (short j = 0; j < count; j++) {
+			if (arr[j * dimension + i] > m[i]) {
+				m[i] = arr[j * dimension + i];
+			}
+		}
 	}
-	return m;
 }
 
 void DynamicDimensionQueue::mean(float* m) {
 	for (short i = 0; i < dimension; i++) {
 		m[i] = sum[i] / count;
 	}
-}
-
-float* DynamicDimensionQueue::std() {
-	float *s = new float[dimension];
-	for (short i = 0; i < dimension; i++) {
-		s[i] = sqrt((max(0.0, ssum[i] - count * pow(sum[i] / count, 2))) / count);
-	}
-	return s;
 }
 
 void DynamicDimensionQueue::std(float *s) {

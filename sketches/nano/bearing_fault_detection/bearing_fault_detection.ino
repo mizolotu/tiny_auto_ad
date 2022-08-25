@@ -2,6 +2,7 @@
 #include <math.h>
 #include <Arduino_LSM9DS1.h>
 
+#include "StreamMeanStd.h"
 #include "DynamicDimensionQueue.h"
 #include "Dense.h"
 #include "Svdd.h"
@@ -10,7 +11,6 @@
 #define XYZ_DIM              3     // xyz dimension for accelerometer data
 #define XYZ_Q_SIZE        1024     // queue size for accelerometer data
 #define XYZ_SCALE         8192     // xyz scale 32767 / 4g (not sure if this is correct though)
-#define FFT_SIZE             1     // number of buffers per fft
 #define FFT_N                5     // fft n
 #define FFT_STEP             8     // fft step
 #define FFT_FEATURES         4     // fft features
@@ -19,49 +19,64 @@
 #define BASELINE_ALPHA       3     // baseline number of stds
 #define INFERENCE_DELAY     10     // delay during the infrence and training
 
-#define N_LAYERS             2     // number of layers 
-#define LAYER_1_UNITS       32     // the 1st layer units
-#define LAYER_2_UNITS       16     // the 2nd layer units
-#define LEARNING_RATE    0.001     // learning rate
-#define TRAIN_COUNT_MAX   1000     // total number of voice instance
+#define N_LAYERS             3     // number of layers 
+#define LAYER_1_UNITS       64     // the 1st layer units
+#define LAYER_2_UNITS       32     // the 2nd layer units
+#define LAYER_3_UNITS       16     // the 3rd layer units
+#define LEARNING_RATE     0.01     // learning rate
 
-#define DEBUG            false     // debug
+#define N_STD              100     // number of samples to calculate std coeffs
+#define N_WARMUP           100     // number of samples to calculate C
+#define N_TRAIN           2000     // number of training samples
+#define N_VALIDATION      2000     // number of validation samples
+
+#define SCORE_ALPHA          3     // score threshold hyperparameter
+
+#define DEBUG            false     // debug?
+#define RECORD_DATA       true     // record data?
 
 unsigned int stage = 0;
 
 // Stages:
-// 0 - calculating C for deep SVDD
-// 1 - training deep SVDD
-// 2 - inferencing
+// 0 - estimating std coeffs
+// 1 - calculating C for the model
+// 2 - updating weights of the model
+// 3 - calculating score threshold
+// 4 - inferencing
 
 unsigned int fft_count = 0;
 unsigned int sample_count = 0;
 unsigned int total_count = 0;
 unsigned int window_count = 0;
 
-DynamicDimensionQueue xyz_q(XYZ_Q_SIZE, XYZ_DIM);
+DynamicDimensionQueue x_q(XYZ_Q_SIZE, XYZ_DIM);
 DynamicDimensionQueue fft_q(FFT_Q_SIZE, FFT_FEATURES * XYZ_DIM);
+StreamMeanStd fft_s(FFT_FEATURES * XYZ_DIM);
 
 float x[XYZ_DIM];
 float x_mean[XYZ_DIM];
 float x_std[XYZ_DIM];
 float x_std_thr[XYZ_DIM];
 
+float fft_mean[FFT_FEATURES * XYZ_DIM];
+float fft_std[FFT_FEATURES * XYZ_DIM];
+
 bool is_active;
 
 short re[XYZ_Q_SIZE];
 short im[XYZ_Q_SIZE];
-float freq[FFT_FEATURES * XYZ_DIM];
+float freq[FFT_FEATURES * XYZ_DIM], freq_std[FFT_FEATURES * XYZ_DIM], feature_vector[FFT_FEATURES * XYZ_DIM] ;
 
 int idx;
 int window_start = 0;
 
-Dense layers[2] = {
+Dense layers[3] = {
   Dense(FFT_FEATURES * XYZ_DIM, LAYER_1_UNITS, &relu, &d_relu),
-  Dense(LAYER_1_UNITS, LAYER_2_UNITS, &sigmoid, &d_sigmoid)
+  Dense(LAYER_1_UNITS, LAYER_2_UNITS, &relu, &d_relu),
+  Dense(LAYER_2_UNITS, LAYER_3_UNITS, &sigmoid, &d_sigmoid)
 };
 
-Svdd model = Svdd(N_LAYERS, layers, LEARNING_RATE);
+Svdd model = Svdd(N_LAYERS, layers, LEARNING_RATE, SCORE_ALPHA);
 
 void setup() {
   
@@ -69,11 +84,15 @@ void setup() {
   while (!Serial);
 
   if (!IMU.begin()) {
-    Serial.println("Failed to initialize IMU!");
+    if (DEBUG) {
+      Serial.println("Failed to initialize IMU!");
+    }
     while (1);
   }
 
-  Serial.println("Recoding the baseline... THE MOTOR SHOULD BE OFF!");
+  if (DEBUG) {
+    Serial.println("Recoding the baseline... THE MOTOR SHOULD BE OFF!");
+  }
   
   for (unsigned short i=0; i<XYZ_Q_SIZE; i++) {
   
@@ -91,7 +110,7 @@ void setup() {
 
     // add the new point to the baseline queue
        
-    xyz_q.enqueue(x);
+    x_q.enqueue(x);
 
     total_count += 1;
 
@@ -99,11 +118,13 @@ void setup() {
     
   }
 
-  // Save xyz std
+  // save xyz std
 
-  xyz_q.std(x_std_thr);
-  
-  Serial.println("Training the model... DO NOT MOVE THE BOARD!");
+  x_q.std(x_std_thr);
+
+  if (DEBUG) {
+    Serial.println("Training the model... ACTIVATE THE MOTOR, BUT DO NOT MOVE THE BOARD!");
+  }
 
 }
 
@@ -112,7 +133,7 @@ void loop() {
 
   // calculate mean
 
-  xyz_q.mean(x_mean);
+  x_q.mean(x_mean);
   
   // get new xyz data point
   
@@ -128,7 +149,7 @@ void loop() {
 
   // enque the point
 
-  xyz_q.enqueue(x);
+  x_q.enqueue(x);
  
   // check if there is activity
 
@@ -142,29 +163,24 @@ void loop() {
   }
 
   if (is_active) {
-    window_count = FFT_FEATURES;
+    window_count = FFT_FEATURES + FFT_Q_SIZE - 1;
   }
 
-  if (DEBUG) {
-    Serial.print(fft_count);
-    Serial.print(", ");
-    Serial.print(window_count);
-    Serial.println();
-  }
-
-  // check that there is enough samples to compute fft
+  // check that there is enough samples to compute the first fft
 
   if (fft_count >= FFT_STEP) {
 
-    // check that more fft features are required
+    // check that more fft features are still required
 
     if (window_count > 0) {
+
+      // perform fft
 
       for (unsigned short j = 0; j < XYZ_DIM; j++) {
 
         for (unsigned short i = 0; i < FFT_STEP; i++) {
-          xyz_q.get(xyz_q.size() - FFT_STEP + i, x);
-          re[i] = x[j];
+          x_q.get(x_q.size() - FFT_STEP + i, x);          
+          re[i] = (x[j] - x_mean[j]); // / x_std_thr[j];  // should we divide by std here or removing the baseline is enough?
           im[i] = 0;
         }
           
@@ -183,57 +199,118 @@ void loop() {
       }
 
       if (window_start >= FFT_FEATURES - 1) {
-          
-        fft_q.enqueue(freq);
      
-        if (DEBUG) {
-          Serial.println(fft_q.size());
-          Serial.println(window_start);
-          Serial.println("");
-        }
-
-        sample_count += 1;
-
         if (stage == 0) {
-
-          // updating c
-          
-          model.forward(freq);
-          
-        } else if (stage == 1) {
-
-          // updating weights and biases
-          
-          model.forward(freq);
-
-          //if (DEBUG) {
-          Serial.print("Loss: ");
-          Serial.print(model.get_score());
-          Serial.println("");
-          //}
-          
-          model.backward(freq);
-          
+        
+          fft_s.enqueue(freq);
+          sample_count += 1;
+        
         } else {
 
-          // calculating score
-          
-          model.forward(freq);
+          // standardize fft vector
 
-          Serial.print("Score: ");
-          Serial.print(model.get_score());
-          Serial.println("");
-          
-        }
-          
-        if (DEBUG) {
-          for (unsigned short j = 0; j < FFT_FEATURES * XYZ_DIM; j++) {
-            Serial.print(freq[j]);
-            Serial.print(",");
+          for (unsigned short i = 0; i < FFT_FEATURES * XYZ_DIM; i++) {
+            if (fft_std[i] == 0) {
+              freq_std[i] = 0;
+            } else {
+              freq_std[i] = (freq[i] - fft_mean[i]) / fft_std[i];
+            }
           }
-          Serial.println("");
-          Serial.println("");
-        }
+
+          // enqueue the resulting standardized frequency vector to the queue
+
+          fft_q.enqueue(freq_std);
+
+          // calculate features 
+
+          if (fft_q.isFull()) {
+              
+            fft_q.xmax(feature_vector);
+            //fft_q.mean(feature_vector);
+
+            if (stage == 1) { 
+
+              // update c
+          
+              model.forward(freq_std);
+          
+            } else if (stage == 2) {
+
+              // update weights and biases
+          
+              model.forward(freq_std);
+
+              if (DEBUG) {
+                Serial.print(sample_count);
+                Serial.print("/");
+                Serial.print(N_TRAIN);
+                Serial.print(" Loss: ");
+                Serial.print(model.get_score(), 16);
+                Serial.println("");
+              }
+
+              if (RECORD_DATA) {
+                Serial.print("<");
+                for (unsigned short j = 0; j < FFT_FEATURES * XYZ_DIM; j++) {
+                  Serial.print(freq[j], 16);
+                  (j < FFT_FEATURES * XYZ_DIM - 1) ? Serial.print(',') : Serial.print('>'); 
+                }          
+                Serial.println("");
+              }
+            
+              model.backward(freq_std);
+          
+            } else if (stage == 3) {
+
+              // update only the score threshold
+
+              model.forward(freq_std);
+
+              if (DEBUG) {
+                Serial.print(sample_count);
+                Serial.print("/");
+                Serial.print(N_VALIDATION);
+                Serial.println("");
+              }
+
+              if (RECORD_DATA) {
+                Serial.print("<");
+                for (unsigned short j = 0; j < FFT_FEATURES * XYZ_DIM; j++) {
+                  Serial.print(freq_std[j], 16);
+                  (j < FFT_FEATURES * XYZ_DIM - 1) ? Serial.print(',') : Serial.print('>'); 
+                }          
+                Serial.println("");
+              }
+            
+            } else {
+
+              // calculate score (c should be fixed by this point)
+          
+              model.forward(freq_std);
+
+              if (DEBUG && (model.get_score() > model.get_score_thr())) {
+                Serial.print("ANOMALY DETECTED (score = ");
+                Serial.print(model.get_score());
+                Serial.print(")!");
+                Serial.println("");     
+              }
+
+              if (RECORD_DATA) {
+                Serial.print("<");
+                for (unsigned short j = 0; j < FFT_FEATURES * XYZ_DIM; j++) {
+                  Serial.print(freq_std[j], 16);
+                  (j < FFT_FEATURES * XYZ_DIM - 1) ? Serial.print(',') : Serial.print('>'); 
+                }          
+                Serial.println("");
+              }
+            
+            }
+
+            sample_count += 1;
+
+          }
+      
+        }    
           
       }
 
@@ -248,157 +325,88 @@ void loop() {
 
   }
 
-  if (stage == 0 && fft_q.isFull()) {
+  if (stage == 0 && sample_count >= N_STD) {
 
-    model.fix_c();    
-      
-    Serial.println("SVDD center has been found!");
-    for (unsigned short j = 0; j < LAYER_2_UNITS; j++) {
-      Serial.print(model.get_c(j));
-      Serial.print(",");
+    fft_s.mean(fft_mean);
+    fft_s.std(fft_std);
+
+    if (DEBUG) {
+      Serial.println("");
+      Serial.println("Standardization coefficients have been found!");
+      Serial.println("FFT mean:");
+      for (unsigned short j = 0; j < XYZ_DIM * FFT_FEATURES; j++) {
+        Serial.print(fft_mean[j]);
+        Serial.print(",");
+      }
+      Serial.println("");
+      Serial.println("FFT std:");
+      for (unsigned short j = 0; j < XYZ_DIM * FFT_FEATURES; j++) {
+        Serial.print(fft_std[j]);
+        Serial.print(",");
+      }
+      Serial.println("");
+      Serial.println("");
     }
-    Serial.println("");
-    Serial.println("");
 
     sample_count = 0;
     stage = 1;
     
-  } else if (stage == 1 && sample_count >= TRAIN_COUNT_MAX) {
+  } else if (stage == 1 && sample_count >= N_WARMUP) {
+
+    model.fix_c();    
+    
+    if (DEBUG) {  
+      Serial.println("SVDD center has been found!");
+      for (unsigned short j = 0; j < LAYER_2_UNITS; j++) {
+        Serial.print(model.get_c(j));
+        Serial.print(",");
+      }
+      Serial.println("");
+      Serial.println("");
+    }
 
     sample_count = 0;
     stage = 2;
     
-  }
-
-    //
-
-    /*
-
-    x_mean += x[0];
-    y_mean += x[1];
-    z_mean += x[2];
-    x_std += pow(x, 2);
-    y_std += pow(y, 2);
-    z_std += pow(z, 2);
-
-    if (sample_count >= BASELINE_STEPS) {
-
-      x_mean = x_mean / BASELINE_STEPS;
-      y_mean = y_mean / BASELINE_STEPS;
-      z_mean = z_mean / BASELINE_STEPS;
-
-      x_std = sqrt((max(0, x_std - BASELINE_STEPS * pow(x_mean, 2)))/BASELINE_STEPS);
-      y_std = sqrt((max(0, y_std - BASELINE_STEPS * pow(y_mean, 2)))/BASELINE_STEPS);
-      z_std = sqrt((max(0, z_std - BASELINE_STEPS * pow(z_mean, 2)))/BASELINE_STEPS);
-
-      Serial.println(x_mean, 16);
-      Serial.println(y_mean, 16);
-      Serial.println(z_mean, 16);
-      
-      Serial.println(x_std, 16);
-      Serial.println(y_std, 16);
-      Serial.println(z_std, 16);     
-
-      for (unsigned short i = 0; i < XYZ_BUFFER_SIZE; i++) {
-        if (IMU.accelerationAvailable()) {
-          IMU.readAcceleration(x, y, z);
-        }
-        xyz[i][0] = round((x - x_mean) * XYZ_SCALE);
-        xyz[i][1] = round((y - y_mean) * XYZ_SCALE);
-        xyz[i][2] = round((z - z_mean) * XYZ_SCALE);
-        delay(DELAY);
-      }
-
-      for (unsigned short j = 0; j < 3; j++) {   
-        for (unsigned short i = 0; i < XYZ_BUFFER_SIZE; i++) {
-          re[i] = xyz[i][j];
-          im[i] = 0;
-        }
-
-        fix_fft(re, im, FFT_N, 0);
-      
-        for (unsigned short i = 0; i < FFT_FEATURES; i++) {
-          freq[i * 3 + j] = (int)(sqrt(re[0] * re[0] + im[0] * im[0]) / 2); // only the first frequency is used
-        }
-
-      }
-
-      stage = 1;
-
-    }
-
-    */
-    
-    /*
-
-    for (unsigned short i = 0; i < XYZ_BUFFER_SIZE - 1; i++) {
-      for (unsigned short j = 0; j < 3; j++) {
-        xyz[i][j] = xyz[i + 1][j];
-      }
-    }
-
-    if ((abs(x - x_mean) > BASELINE_ALPHA * x_std) || (abs(y - y_mean) > BASELINE_ALPHA * y_std) || (abs(z - z_mean) > BASELINE_ALPHA * z_std)) {
-      window_count = FFT_FEATURES;      
-    }
-
-    xyz[BUFFER_SIZE - 1][0] = int(x);
-    xyz[BUFFER_SIZE - 1][1] = int(y);
-    xyz[BUFFER_SIZE - 1][2] = int(z);
-    
-
-    if (buffer_count >= FFT_STEP) {
-
-      // FFT
-
-      if (window_count > 0) {
-
-        for (unsigned short j = 0; j < 3; j++) {
-
-          // copy previous samples
-
-          for (unsigned short i = 0; i < FFT_FEATURES - 1; i++) {
-            freq[i * 3 + j] = freq[(i + 1) * 3 + j];  
-          }
-       
-          for (unsigned short i = 0; i < XYZ_BUFFER_SIZE; i++) {
-            re[i] = xyz[i][j];
-            im[i] = 0;
-          }
-
-          fix_fft(re, im, FFT_N, 0);
-      
-          freq[(FFT_FEATURES - 1) * 3  + j] = (int)(sqrt(re[0] * re[0] + im[0] * im[0]) / 2); // only the first frequency is used
-
-        }
-
-        for (unsigned short i = 0; i < FFT_FEATURES; i++) {
-          for (unsigned short j = 0; j < 3; j++) {
-            Serial.print(freq[i * 3 + j]);
-            Serial.print(",");
-          }
-          Serial.println("");
-        }
-    
-        Serial.println("");
-    
-        window_count -= 1;    
-    
-      }
+  } else if (stage == 2 && sample_count >= N_TRAIN) {
   
-      //while (1);
-      buffer_count = 0;
+    model.switch_score_thr();
 
-    } 
+    if (DEBUG) {
+      Serial.println("Training has been completed!");
+      Serial.println("Validating...");
+      Serial.println("");
+      Serial.println("");
+    }
+    
+    sample_count = 0;
+    stage = 3;
+    
+  } else if (stage == 3 && sample_count >= N_VALIDATION) {
 
-    */
+    model.switch_score_thr();
+
+    
+    if (DEBUG) {
+      Serial.println("Validation has been completed!");
+      Serial.print("Score threshold: ");
+      Serial.print(model.get_score_thr());
+      Serial.println("");
+      Serial.println("");
+    }
+    
+    sample_count = 0;
+    stage = 4;
+
+  }
     
   fft_count += 1;
   
   total_count += 1;
 
-  if (DEBUG) {
+  /*if (DEBUG) {
     Serial.println(total_count);
-  }
+  }*/
   
   delay(INFERENCE_DELAY);
 

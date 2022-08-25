@@ -31,9 +31,8 @@ class DynamicDimensionQueue {
 		short size();                 // get the queue size
 		bool isEmpty();               // check whether the queue is empty
 		bool isFull();                // check whether the queue is full
-		float* mean();                // calculate the queue mean
+		void xmax(float* m);            // calculate the queue max
 		void mean(float* m);          // calculate the queue mean
-		float* std();                 // calculate the queue std
 		void std(float* s);           // calculate the queue std
 		float* get(short i);          // get an element of the queue
 		void get(short i, float* x);  // get an element of the queue

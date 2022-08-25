@@ -30,15 +30,15 @@ def receive_vector(start_marker, end_marker):
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description='Parse args')
-    parser.add_argument('-p', '--port', help='Serial port', default='/dev/ttyACM0')
+    parser.add_argument('-p', '--port', help='Serial port', default='/dev/ttyACM1')
     parser.add_argument('-r', '--rate', help='Baud rate', default=115200, type=int)
     parser.add_argument('-s', '--start', help='Start marker', default=60, type=int)
     parser.add_argument('-e', '--end', help='End marker', default=62, type=int)
-    parser.add_argument('-b', '--baseline', help='Number of vectors to record as a baseline', default=500, type=int)
-    parser.add_argument('-n', '--nvectors', help='Number of vectors to record', default=2500, type=int)
-    parser.add_argument('-f', '--fnames', help='File names', nargs='+', default=['0_0', '100_100', '200_200', '300_300', '400_400', '500_500'])
-    parser.add_argument('-l', '--label', help='File path', default='sand')
-    parser.add_argument('-d', '--directory', help='Directory to store the dataset', default='data/bearing')
+    parser.add_argument('-b', '--baseline', help='Number of vectors to record as a baseline', default=0, type=int)
+    parser.add_argument('-n', '--nvectors', help='Number of vectors to record', default=2000, type=int)
+    parser.add_argument('-f', '--fnames', help='File names', nargs='+', default=['500_500'])
+    parser.add_argument('-l', '--label', help='File path', default='crack')
+    parser.add_argument('-d', '--directory', help='Directory to store the dataset', default='data/bearing_fft_std')
     args = parser.parse_args()
 
 
